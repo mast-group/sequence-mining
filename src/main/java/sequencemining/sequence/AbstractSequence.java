@@ -7,8 +7,7 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 
-public abstract class AbstractSequence extends AbstractCollection<Integer>
-		implements Serializable {
+public abstract class AbstractSequence extends AbstractCollection<Integer>implements Serializable {
 	private static final long serialVersionUID = 686688001826219278L;
 
 	protected List<Integer> items;
@@ -65,33 +64,15 @@ public abstract class AbstractSequence extends AbstractCollection<Integer>
 			this.items.add(set);
 	}
 
+	/** Code for covering sequences *with gaps* */
+
 	/**
-	 * Check if this sequence contains given sequence
+	 * Check if this sequence contains given sequence (allowing gaps)
 	 *
 	 * @param sequence
 	 */
 	public boolean contains(final Sequence seq) {
 		int pos = 0;
-		for (int occ = 0; occ < seq.getOccurence(); occ++) {
-			pos = this.contains(seq, pos);
-			if (pos == -1)
-				return false;
-		}
-		return true;
-	}
-
-	/** Code for covering sequences *with gaps* */
-
-	/**
-	 * Check if this sequence contains given sequence (allowing gaps) from
-	 * startIndex onwards
-	 *
-	 * @param sequence
-	 * @return index after which contained seq finishes or -1 if seq is not
-	 *         contained
-	 */
-	public int contains(final AbstractSequence seq, final int startIndex) {
-		int pos = startIndex;
 		boolean containsItem;
 		for (final int item : seq.items) {
 			containsItem = false;
@@ -103,33 +84,30 @@ public abstract class AbstractSequence extends AbstractCollection<Integer>
 				}
 			}
 			if (!containsItem)
-				return -1;
+				return false;
 		}
-		return pos;
+		return true;
 	}
 
 	/** Code for covering sequences *without gaps* */
 	//
 	// /**
-	// * Check if this sequence contains given sequence (without gaps) from
-	// * startIndex onwards
+	// * Check if this sequence contains given sequence (without gaps)
 	// *
 	// * @param sequence
-	// * @return index after which contained seq finishes or -1 if seq is not
-	// * contained
 	// */
-	// public int contains(final AbstractSequence seq, final int startIndex) {
-	// outer: for (int i = startIndex; i < this.items.size()
+	// public int contains(final Sequence seq) {
+	// outer: for (int i = 0; i < this.items.size()
 	// - seq.items.size() + 1; i++) {
 	// if (this.items.get(i).equals(seq.items.get(0))) {
 	// for (int j = 1; j < seq.items.size(); j++) {
 	// if (!this.items.get(i + j).equals(seq.items.get(j)))
 	// continue outer;
 	// }
-	// return i + seq.items.size();
+	// return true;
 	// }
 	// }
-	// return -1;
+	// return false;
 	// }
 
 	/** Code for covering sequences *with gaps* but *without overlap* */
@@ -141,8 +119,7 @@ public abstract class AbstractSequence extends AbstractCollection<Integer>
 	 * @param sequence
 	 * @return BitSet of items in order with the covered items set true
 	 */
-	public BitSet getCovered(final AbstractSequence seq,
-			final BitSet alreadyCoveredItems) {
+	public BitSet getCovered(final AbstractSequence seq, final BitSet alreadyCoveredItems) {
 		int pos = 0;
 		boolean containsItem;
 		final BitSet coveredItems = new BitSet(this.size());

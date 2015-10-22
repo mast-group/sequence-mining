@@ -6,7 +6,6 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -214,29 +213,19 @@ public class SequenceMining extends SequenceMiningCore {
 			// split the line into items
 			final String[] lineSplit = line.split(" ");
 			// for each item
-			final HashSet<Sequence> seenItems = new HashSet<>();
 			for (final String itemString : lineSplit) {
 				final int item = Integer.parseInt(itemString);
 				if (item >= 0) { // ignore end of itemset/sequence tags
-					final Sequence seq = new Sequence(item);
-					recursiveSetOccurrence(seq, seenItems); // set occurrence
-					seenItems.add(seq); // add item to seen
+					// increase the support count of the item
+					singletons.add(new Sequence(item));
 				}
 			}
-			singletons.addAll(seenItems); // increase the support of the items
 		}
 
 		// close the input file
 		LineIterator.closeQuietly(it);
 
 		return singletons;
-	}
-
-	private static void recursiveSetOccurrence(final Sequence seq, final HashSet<Sequence> seenItems) {
-		if (seenItems.contains(seq)) {
-			seq.incrementOccurence();
-			recursiveSetOccurrence(seq, seenItems);
-		}
 	}
 
 	/** Convert string level to level class */

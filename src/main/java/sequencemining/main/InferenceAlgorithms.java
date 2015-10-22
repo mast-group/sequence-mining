@@ -1,20 +1,22 @@
 package sequencemining.main;
 
-import sequencemining.sequence.Sequence;
-import sequencemining.transaction.Transaction;
-
 import java.io.Serializable;
 import java.util.BitSet;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map.Entry;
+
+import com.google.common.collect.HashMultiset;
+import com.google.common.collect.Multiset;
+
+import sequencemining.sequence.Sequence;
+import sequencemining.transaction.Transaction;
 
 /** Container class for Inference Algorithms */
 public class InferenceAlgorithms {
 
 	/** Interface for the different inference algorithms */
 	public interface InferenceAlgorithm {
-		public HashSet<Sequence> infer(final Transaction transaction);
+		public Multiset<Sequence> infer(final Transaction transaction);
 	}
 
 	/**
@@ -27,42 +29,34 @@ public class InferenceAlgorithms {
 		private static final long serialVersionUID = 9173178089235828142L;
 
 		@Override
-		public HashSet<Sequence> infer(final Transaction transaction) {
+		public Multiset<Sequence> infer(final Transaction transaction) {
 
-			final HashSet<Sequence> covering = new HashSet<>();
+			final Multiset<Sequence> covering = HashMultiset.create();
+			;
 			int lenCovering = 0;
 			final int transactionSize = transaction.size();
 			final BitSet coveredItems = new BitSet(transactionSize);
 
-			final HashMap<Sequence, Double> cachedSequences = transaction
-					.getCachedSequences();
+			final HashMap<Sequence, Double> cachedSequences = transaction.getCachedSequences();
 			while (coveredItems.cardinality() != transactionSize) {
 
 				double minCostPerItem = Double.POSITIVE_INFINITY;
 				Sequence bestSeq = null;
 				BitSet bestSeqCoveredItems = null;
 
-				for (final Entry<Sequence, Double> entry : cachedSequences
-						.entrySet()) {
+				for (final Entry<Sequence, Double> entry : cachedSequences.entrySet()) {
 
 					// Get sequence
 					final Sequence seq = entry.getKey();
 
-					// Ignore sequences which already cover
-					if (covering.contains(seq))
-						continue;
-
 					// How many additional items does sequence cover?
-					final BitSet seqCoveredItems = transaction.getCovered(seq,
-							coveredItems);
+					final BitSet seqCoveredItems = transaction.getCovered(seq, coveredItems);
 					// Ignore sequences which don't cover anything
 					if (seqCoveredItems.isEmpty())
 						continue;
 
 					final double cost = -Math.log(entry.getValue())
-							+ sumLogRange(lenCovering + 1,
-									lenCovering + seq.size())
-							- sumLogRange(1, seq.size());
+							+ sumLogRange(lenCovering + 1, lenCovering + seq.size()) - sumLogRange(1, seq.size());
 					final double costPerItem = cost / seq.size();
 
 					if (costPerItem < minCostPerItem) {
@@ -84,9 +78,7 @@ public class InferenceAlgorithms {
 					int index = 0;
 					while (coveredItems.cardinality() != transactionSize) {
 						index = coveredItems.nextClearBit(index);
-						final Sequence seq = new Sequence(
-								transaction.get(index));
-						recursiveSetOccurrence(seq, covering);
+						final Sequence seq = new Sequence(transaction.get(index));
 						covering.add(seq);
 						coveredItems.set(index);
 					}
@@ -102,14 +94,6 @@ public class InferenceAlgorithms {
 			for (int i = a; i <= b; i++)
 				sum += Math.log(i);
 			return sum;
-		}
-
-		private void recursiveSetOccurrence(final Sequence seq,
-				final HashSet<Sequence> seenItems) {
-			if (seenItems.contains(seq)) {
-				seq.incrementOccurence();
-				recursiveSetOccurrence(seq, seenItems);
-			}
 		}
 
 	}

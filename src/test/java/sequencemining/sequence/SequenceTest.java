@@ -71,15 +71,11 @@ public class SequenceTest {
 		final Transaction trans2 = new Transaction(3, 1, 4, 2, 5);
 		final Transaction trans3 = new Transaction(3, 1, 4, 2, 5, 1, 6, 2, 7);
 		final Sequence seq = new Sequence(1, 2);
-		final Sequence seqR = new Sequence(1, 2);
-		seqR.incrementOccurence();
 
 		assertEquals(true, trans1.contains(seq));
-		assertEquals(true, trans1.contains(seqR));
 		assertEquals(true, trans2.contains(seq));
-		assertEquals(false, trans2.contains(seqR));
 		assertEquals(true, trans3.contains(seq));
-		assertEquals(true, trans3.contains(seqR));
+
 	}
 
 	// @Test
@@ -110,15 +106,10 @@ public class SequenceTest {
 	// final Transaction trans2 = new Transaction(3, 1, 2, 4);
 	// final Transaction trans3 = new Transaction(3, 1, 2, 4, 1, 2, 5);
 	// final Sequence seq = new Sequence(1, 2);
-	// final Sequence seqR = new Sequence(1, 2);
-	// seqR.incrementOccurence();
 	//
 	// assertEquals(true, trans1.contains(seq));
-	// assertEquals(true, trans1.contains(seqR));
 	// assertEquals(true, trans2.contains(seq));
-	// assertEquals(false, trans2.contains(seqR));
 	// assertEquals(true, trans3.contains(seq));
-	// assertEquals(true, trans3.contains(seqR));
 	//
 	// }
 

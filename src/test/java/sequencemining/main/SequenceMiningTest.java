@@ -3,6 +3,7 @@ package sequencemining.main;
 import static org.junit.Assert.assertEquals;
 
 import java.util.HashSet;
+import java.util.Set;
 
 import org.junit.Test;
 
@@ -47,33 +48,22 @@ public class SequenceMiningTest {
 
 		// Test greedy
 		final InferenceAlgorithm inferGreedy = new InferGreedy();
-		final HashSet<Sequence> actual = inferGreedy.infer(transaction1);
+		final Set<Sequence> actual = inferGreedy.infer(transaction1).elementSet();
 		assertEquals(expected1, actual);
 		// assertTrue(order1.containsAll(actual.values()));
 
 		// Subsequences
 		final Sequence s4 = new Sequence(1, 2);
 		final double p4 = 0.5;
-		final Sequence s42 = new Sequence(1, 2);
-		s42.incrementOccurence();
-		final double p42 = 0.4;
-		final Sequence s43 = new Sequence(1, 2);
-		s43.incrementOccurence();
-		s43.incrementOccurence();
-		final double p43 = 0.3;
 
 		// Transaction #2
 		final Transaction transaction2 = new Transaction(1, 2, 1, 2, 1, 2);
 		transaction2.initializeCachedSequences(HashMultiset.create(), 0);
 		transaction2.addSequenceCache(s4, p4);
-		transaction2.addSequenceCache(s42, p42);
-		transaction2.addSequenceCache(s43, p43);
 
 		// Expected solution #2
 		final HashSet<Sequence> expected2 = new HashSet<>();
 		expected2.add(s4);
-		expected2.add(s42);
-		expected2.add(s43);
 		final HashSet<Integer> order2 = new HashSet<>();
 		order2.add(0);
 		order2.add(2);
@@ -82,7 +72,7 @@ public class SequenceMiningTest {
 		// final double expectedCost2 = -Math.log(p4);
 
 		// Test greedy
-		final HashSet<Sequence> actual2 = inferGreedy.infer(transaction2);
+		final Set<Sequence> actual2 = inferGreedy.infer(transaction2).elementSet();
 		assertEquals(expected2, actual2);
 		// assertTrue(order2.containsAll(actual2.values()));
 		// transaction2.setCachedCovering(actual2);

@@ -4,12 +4,10 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Set;
 
 import com.google.common.collect.Multiset;
 
@@ -24,17 +22,14 @@ public class Transaction extends AbstractSequence implements Serializable {
 	private HashMap<Sequence, Double> cachedSequences;
 
 	/** Cached covering for this transaction */
-	private HashSet<Sequence> cachedCovering;
-	private HashSet<Sequence> tempCachedCovering;
+	private Multiset<Sequence> cachedCovering;
+	private Multiset<Sequence> tempCachedCovering;
 
-	public void initializeCachedSequences(final Multiset<Sequence> singletons,
-			final long noTransactions) {
+	public void initializeCachedSequences(final Multiset<Sequence> singletons, final long noTransactions) {
 		cachedSequences = new HashMap<>();
-		for (final com.google.common.collect.Multiset.Entry<Sequence> entry : singletons
-				.entrySet()) {
+		for (final com.google.common.collect.Multiset.Entry<Sequence> entry : singletons.entrySet()) {
 			if (this.contains(entry.getElement()))
-				cachedSequences.put(entry.getElement(), entry.getCount()
-						/ (double) noTransactions);
+				cachedSequences.put(entry.getElement(), entry.getCount() / (double) noTransactions);
 		}
 	}
 
@@ -51,8 +46,7 @@ public class Transaction extends AbstractSequence implements Serializable {
 	}
 
 	public void updateCachedSequences(final Map<Sequence, Double> newSequences) {
-		for (final Iterator<Entry<Sequence, Double>> it = cachedSequences
-				.entrySet().iterator(); it.hasNext();) {
+		for (final Iterator<Entry<Sequence, Double>> it = cachedSequences.entrySet().iterator(); it.hasNext();) {
 			final Entry<Sequence, Double> entry = it.next();
 			final Double newProb = newSequences.get(entry.getKey());
 			if (newProb != null)
@@ -71,8 +65,7 @@ public class Transaction extends AbstractSequence implements Serializable {
 		for (final Entry<Sequence, Double> entry : cachedSequences.entrySet()) {
 			final Sequence seq = entry.getKey();
 			if (cachedCovering.contains(seq) && !entry.getValue().equals(0.)) {
-				totalCost += -Math.log(entry.getValue())
-						+ sumLogRange(lenCovering + 1, lenCovering + seq.size())
+				totalCost += -Math.log(entry.getValue()) + sumLogRange(lenCovering + 1, lenCovering + seq.size())
 						- sumLogRange(1, seq.size());
 				lenCovering += seq.size();
 			} else
@@ -92,8 +85,7 @@ public class Transaction extends AbstractSequence implements Serializable {
 	}
 
 	/** Calculate cached cost for structural EM-step */
-	private double calculateCachedCost(final Map<Sequence, Double> sequences,
-			final Set<Sequence> covering) {
+	private double calculateCachedCost(final Map<Sequence, Double> sequences, final Multiset<Sequence> covering) {
 		double totalCost = 0;
 		int lenCovering = 0;
 		for (final Entry<Sequence, Double> entry : cachedSequences.entrySet()) {
@@ -101,9 +93,7 @@ public class Transaction extends AbstractSequence implements Serializable {
 			final Double prob = sequences.get(seq);
 			if (prob != null) {
 				if (covering.contains(seq) && !entry.getValue().equals(0.)) {
-					totalCost += -Math.log(prob)
-							+ sumLogRange(lenCovering + 1,
-									lenCovering + seq.size())
+					totalCost += -Math.log(prob) + sumLogRange(lenCovering + 1, lenCovering + seq.size())
 							- sumLogRange(1, seq.size());
 					lenCovering += seq.size();
 				} else
@@ -120,42 +110,21 @@ public class Transaction extends AbstractSequence implements Serializable {
 		return sum;
 	}
 
-	public void setCachedCovering(final HashSet<Sequence> covering) {
+	public void setCachedCovering(final Multiset<Sequence> covering) {
 		cachedCovering = covering;
 	}
 
-	public HashSet<Sequence> getCachedCovering() {
+	public Multiset<Sequence> getCachedCovering() {
 		return cachedCovering;
 	}
 
-	public void setTempCachedCovering(final HashSet<Sequence> covering) {
+	public void setTempCachedCovering(final Multiset<Sequence> covering) {
 		tempCachedCovering = covering;
 	}
 
-	public HashSet<Sequence> getTempCachedCovering() {
+	public Multiset<Sequence> getTempCachedCovering() {
 		return tempCachedCovering;
 	}
-
-	// /** Get the sequence transitions for this transaction */
-	// public HashMap<Sequence, Sequence> getTransitions() {
-	// final HashMap<Sequence, Sequence> transitions = new HashMap<>();
-	// for (final Entry<Sequence, Integer> entry1 : cachedCovering.entrySet()) {
-	// final int position1 = entry1.getValue();
-	// Sequence nextSeq = null;
-	// int nextPosition = Integer.MAX_VALUE;
-	// for (final Entry<Sequence, Integer> entry2 : cachedCovering
-	// .entrySet()) {
-	// final int position2 = entry2.getValue();
-	// if (!entry1.equals(entry2) && position1 <= position2
-	// && position2 < nextPosition) {
-	// nextSeq = entry2.getKey();
-	// nextPosition = position2;
-	// }
-	// }
-	// transitions.put(entry1.getKey(), nextSeq);
-	// }
-	// return transitions;
-	// }
 
 	/**
 	 * Constructor
