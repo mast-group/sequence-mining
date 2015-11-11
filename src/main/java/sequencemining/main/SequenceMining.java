@@ -57,10 +57,10 @@ public class SequenceMining extends SequenceMiningCore {
 		boolean timestampLog = true;
 
 		@Parameter(names = { "-d", "--dist" }, description = "Save sequence count distribution")
-		private final boolean saveCountDist = false;
+		private boolean saveCountDist = false;
 
 		@Parameter(names = { "-v", "--verbose" }, description = "Print to console instead of logfile")
-		private final boolean verbose = false;
+		private boolean verbose = false;
 	}
 
 	public static void main(final String[] args) throws IOException {
