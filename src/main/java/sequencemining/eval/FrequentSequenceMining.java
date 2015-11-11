@@ -109,7 +109,7 @@ public class FrequentSequenceMining {
 	}
 
 	/** Run BIDE algorithm */
-	public static SortedMap<Sequence, Integer> mineFrequentClosedSequencesBIDE(
+	public static SortedMap<Sequence, Integer> mineClosedFrequentSequencesBIDE(
 			final String dataset, final String saveFile, final double minSupp)
 			throws IOException {
 

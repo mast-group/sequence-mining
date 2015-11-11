@@ -23,62 +23,71 @@ import sequencemining.sequence.Sequence;
 import sequencemining.transaction.TransactionGenerator;
 import sequencemining.util.Logging;
 
-public class BackgroundPrecisionRecall {
+public class SequencePrecisionRecall {
 
 	/** Main Settings */
-	private static final File dbFile = new File("/disk/data1/jfowkes/sequence.txt");
+	private static final File dbFile = new File("/disk/data1/jfowkes/Sequence.txt");
 	private static final File saveDir = new File("/disk/data1/jfowkes/logs/");
 
-	/** FSM Issues to incorporate */
-	private static final String name = "Background";
-	private static final int noIterations = 5_000;
+	/** FIM Issues to incorporate */
+	private static final String name = "caviar";
+	private static final int noIterations = 300;
 
 	/** Previously mined Sequences to use for background distribution */
 	private static final File sequenceLog = new File(
 			"/afs/inf.ed.ac.uk/user/j/jfowkes/Code/Sequences/Logs/ISM-SIGN-27.05.2015-15:12:45.log");
 	private static final int noTransactions = 10_000;
+	private static final int noSpecialSequences = 30;
 
 	/** Sequence Miner Settings */
 	private static final int maxStructureSteps = 100_000;
-	private static final double minSup = 0.05;
+	private static final double minSup = 0.04;
 
 	public static void main(final String[] args) throws IOException, ClassNotFoundException {
 
 		// Read in background distribution
-		final Map<Sequence, Double> backgroundSequences = SequenceMiningCore.readISMSequences(sequenceLog);
+		final Map<Sequence, Double> backgroundSequences = new HashMap<>(
+				SequenceMiningCore.readISMSequences(sequenceLog));
 
 		// Read in associated sequence count distribution
 		@SuppressWarnings("unchecked")
 		final Table<Sequence, Integer, Double> countDist = (Table<Sequence, Integer, Double>) Logging
 				.deserializeFrom(FilenameUtils.removeExtension(sequenceLog.getAbsolutePath()) + ".dist");
 
-		final HashMap<Sequence, Double> sequences = TransactionGenerator
+		// Set up transaction DB
+		final HashMap<Sequence, Double> specialSequences = TransactionGenerator.generateExampleSequences(name,
+				noSpecialSequences, 0);
+		backgroundSequences.putAll(specialSequences);
+		// Generate transaction DB
+		final HashMap<Sequence, Double> Sequences = TransactionGenerator
 				.generateTransactionDatabase(backgroundSequences, countDist, noTransactions, dbFile);
-		System.out.print("\n============= ACTUAL SEQUENCES =============\n");
-		for (final Entry<Sequence, Double> entry : sequences.entrySet()) {
+		System.out.print("\n============= ACTUAL ITEMSETS =============\n");
+		for (final Entry<Sequence, Double> entry : Sequences.entrySet()) {
 			System.out.print(String.format("%s\tprob: %1.5f %n", entry.getKey(), entry.getValue()));
 		}
-		System.out.println("\nNo sequences: " + sequences.size());
+		System.out.print("\n");
+		System.out.println("No Sequences: " + Sequences.size());
 		SequenceScaling.printTransactionDBStats(dbFile);
 
-		precisionRecall(sequences, "GoKRIMP");
-		precisionRecall(sequences, "SQS");
-		precisionRecall(sequences, "FSM");
-		precisionRecall(sequences, "ISM");
+		precisionRecall(Sequences, specialSequences, "GoKRIMP");
+		precisionRecall(Sequences, specialSequences, "SQS");
+		precisionRecall(Sequences, specialSequences, "FSM");
+		precisionRecall(Sequences, specialSequences, "ISM");
 
 	}
 
-	public static void precisionRecall(final Map<Sequence, Double> itemsets, final String algorithm)
-			throws IOException {
+	public static void precisionRecall(final HashMap<Sequence, Double> Sequences,
+			final HashMap<Sequence, Double> specialSequences, final String algorithm) throws IOException {
 
 		// Set up logging
-		final FileOutputStream outFile = new FileOutputStream(
-				saveDir + "/" + algorithm + "_Markov_" + name + "_pr.txt");
+		final FileOutputStream outFile = new FileOutputStream(saveDir + "/" + algorithm + "_" + name + "_pr.txt");
 		final TeeOutputStream out = new TeeOutputStream(System.out, outFile);
 		final PrintStream ps = new PrintStream(out);
 		System.setOut(ps);
 
-		// Mine sequences
+		System.out.println("\nSpecial Sequences: " + noSpecialSequences);
+
+		// Mine Sequences
 		Set<Sequence> minedSequences = null;
 		final File logFile = Logging.getLogFileName(algorithm, true, saveDir, dbFile);
 		final long startTime = System.currentTimeMillis();
@@ -100,10 +109,10 @@ public class BackgroundPrecisionRecall {
 
 		// Calculate sorted precision and recall
 		final int len = minedSequences.size();
-		System.out.println("No. mined sequences: " + len);
+		System.out.println("No. mined Sequences: " + len);
 		final double[] precision = new double[len];
 		final double[] recall = new double[len];
-		for (int k = 1; k <= minedSequences.size(); k++) {
+		for (int k = 1; k <= len; k++) {
 
 			final Set<Sequence> topKMined = Sets.newHashSet();
 			for (final Sequence seq : minedSequences) {
@@ -112,15 +121,17 @@ public class BackgroundPrecisionRecall {
 					break;
 			}
 
-			final double noInBoth = Sets.intersection(itemsets.keySet(), topKMined).size();
+			final double noInBoth = Sets.intersection(Sequences.keySet(), topKMined).size();
+			final double noSpecialInBoth = Sets.intersection(specialSequences.keySet(), topKMined).size();
 			final double pr = noInBoth / (double) topKMined.size();
-			final double rec = noInBoth / (double) itemsets.size();
+			final double rec = noSpecialInBoth / (double) specialSequences.size();
 			precision[k - 1] = pr;
 			recall[k - 1] = rec;
 		}
 
 		// Output precision and recall
 		System.out.println("\n======== " + name + " ========");
+		System.out.println("Special Frequency: " + noSpecialSequences);
 		System.out.println("Time: " + time);
 		System.out.println("Precision (all): " + Arrays.toString(precision));
 		System.out.println("Recall (special): " + Arrays.toString(recall));

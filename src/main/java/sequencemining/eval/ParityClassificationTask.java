@@ -53,7 +53,7 @@ public class ParityClassificationTask {
 		final int maxEMIterations = 1_000;
 		final Map<Sequence, Double> seqsISM = SequenceMining.mineSequences(
 				dbFile, new InferGreedy(), maxStructureSteps, maxEMIterations,
-				null);
+				null, false);
 		System.out.println(seqsISM);
 
 		// Generate int seq features

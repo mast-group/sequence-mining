@@ -12,6 +12,7 @@ import java.util.Map.Entry;
 import java.util.logging.Level;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.io.LineIterator;
 
 import com.beust.jcommander.IStringConverter;
@@ -21,6 +22,7 @@ import com.beust.jcommander.ParameterException;
 import com.google.common.base.Charsets;
 import com.google.common.collect.HashMultiset;
 import com.google.common.collect.Multiset;
+import com.google.common.collect.Table;
 import com.google.common.io.Files;
 
 import sequencemining.main.InferenceAlgorithms.InferGreedy;
@@ -40,7 +42,7 @@ public class SequenceMining extends SequenceMiningCore {
 				"/afs/inf.ed.ac.uk/user/j/jfowkes/Code/Sequences/Datasets/API/java/java.dat");
 
 		@Parameter(names = { "-s", "--maxSteps" }, description = "Max structure steps")
-		int maxStructureSteps = 100_000;
+		int maxStructureSteps = 1_000_000;
 
 		@Parameter(names = { "-i", "--iterations" }, description = "Max iterations")
 		int maxEMIterations = 1_000;
@@ -53,6 +55,9 @@ public class SequenceMining extends SequenceMiningCore {
 
 		@Parameter(names = { "-t", "--timestamp" }, description = "Timestamp Logfile", arity = 1)
 		boolean timestampLog = true;
+
+		@Parameter(names = { "-d", "--dist" }, description = "Save sequence count distribution")
+		private final boolean saveCountDist = false;
 
 		@Parameter(names = { "-v", "--verbose" }, description = "Print to console instead of logfile")
 		private final boolean verbose = false;
@@ -78,7 +83,8 @@ public class SequenceMining extends SequenceMiningCore {
 				logFile = Logging.getLogFileName("ISM", params.timestampLog, LOG_DIR, params.dataset);
 
 			// Mine interesting sequences
-			mineSequences(params.dataset, inferenceAlg, params.maxStructureSteps, params.maxEMIterations, logFile);
+			mineSequences(params.dataset, inferenceAlg, params.maxStructureSteps, params.maxEMIterations, logFile,
+					params.saveCountDist);
 
 		} catch (final ParameterException e) {
 			System.out.println(e.getMessage());
@@ -89,7 +95,8 @@ public class SequenceMining extends SequenceMiningCore {
 
 	/** Mine interesting sequences */
 	public static Map<Sequence, Double> mineSequences(final File inputFile, final InferenceAlgorithm inferenceAlgorithm,
-			final int maxStructureSteps, final int maxEMIterations, final File logFile) throws IOException {
+			final int maxStructureSteps, final int maxEMIterations, final File logFile, final boolean saveCountDist)
+					throws IOException {
 
 		// Set up logging
 		if (logFile != null)
@@ -127,6 +134,12 @@ public class SequenceMining extends SequenceMiningCore {
 					intMap.get(entry.getKey())));
 		}
 		logger.info("\n");
+
+		// Optionally save sequence count distribution
+		if (saveCountDist) {
+			final Table<Sequence, Integer, Double> countDist = EMStep.getCountDistribution(transactions);
+			Logging.serialize(countDist, FilenameUtils.removeExtension(logFile.getAbsolutePath()) + ".dist");
+		}
 
 		return sortedSequences;
 	}
