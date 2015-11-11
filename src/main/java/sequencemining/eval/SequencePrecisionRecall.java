@@ -35,7 +35,7 @@ public class SequencePrecisionRecall {
 
 	/** Previously mined Sequences to use for background distribution */
 	private static final File sequenceLog = new File(
-			"/afs/inf.ed.ac.uk/user/j/jfowkes/Code/Sequences/Logs/ISM-SIGN-27.05.2015-15:12:45.log");
+			"/afs/inf.ed.ac.uk/user/j/jfowkes/Code/Sequences/Logs/ISM-SIGN-11.11.2015-13:41:54.log");
 	private static final int noTransactions = 10_000;
 	private static final int noSpecialSequences = 30;
 
@@ -69,7 +69,7 @@ public class SequencePrecisionRecall {
 		System.out.println("No Sequences: " + Sequences.size());
 		SequenceScaling.printTransactionDBStats(dbFile);
 
-		precisionRecall(Sequences, specialSequences, "GoKRIMP");
+		precisionRecall(Sequences, specialSequences, "GoKrimp");
 		precisionRecall(Sequences, specialSequences, "SQS");
 		precisionRecall(Sequences, specialSequences, "FSM");
 		precisionRecall(Sequences, specialSequences, "ISM");
