@@ -58,6 +58,10 @@ public class SequencePrecisionRecall {
 		final HashMap<Sequence, Double> specialSequences = TransactionGenerator.generateExampleSequences(name,
 				noSpecialSequences, 0);
 		backgroundSequences.putAll(specialSequences);
+		// Add special sequences to count distribution
+		for (final Entry<Sequence, Double> entry : specialSequences.entrySet())
+			countDist.put(entry.getKey(), 1, entry.getValue());
+
 		// Generate transaction DB
 		final HashMap<Sequence, Double> Sequences = TransactionGenerator
 				.generateTransactionDatabase(backgroundSequences, countDist, noTransactions, dbFile);
