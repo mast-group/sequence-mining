@@ -93,7 +93,7 @@ public class TransactionGenerator {
 	 * @return set of sequences added to transaction
 	 */
 	public static HashMap<Sequence, Double> generateTransactionDatabase(final Map<Sequence, Double> sequences,
-			final Table<Sequence, Integer, Double> counts, final int noTransactions, final File outFile)
+			final Table<Sequence, Integer, Double> probabilities, final int noTransactions, final File outFile)
 					throws IOException {
 
 		// Set random number seeds
@@ -108,18 +108,18 @@ public class TransactionGenerator {
 		// Set output file
 		final PrintWriter out = new PrintWriter(outFile, "UTF-8");
 
-		// Normalize counts
-		final Map<Sequence, EnumeratedIntegerDistribution> countDists = new HashMap<>();
+		// Add to distribution class for easy sampling
+		final Map<Sequence, EnumeratedIntegerDistribution> dists = new HashMap<>();
 		for (final Sequence seq : sequences.keySet()) {
 			final List<Integer> singletons = new ArrayList<>();
 			final List<Double> probs = new ArrayList<>();
-			for (final Entry<Integer, Double> entry : counts.row(seq).entrySet()) {
+			for (final Entry<Integer, Double> entry : probabilities.row(seq).entrySet()) {
 				singletons.add(entry.getKey());
 				probs.add(entry.getValue());
 			}
-			final EnumeratedIntegerDistribution countDist = new EnumeratedIntegerDistribution(randomC,
+			final EnumeratedIntegerDistribution dist = new EnumeratedIntegerDistribution(randomC,
 					Ints.toArray(singletons), Doubles.toArray(probs));
-			countDists.put(seq, countDist);
+			dists.put(seq, dist);
 		}
 
 		// Generate transaction database
@@ -127,8 +127,7 @@ public class TransactionGenerator {
 		while (count < noTransactions) {
 
 			// Generate transaction from distribution
-			final Transaction transaction = sampleFromDistribution(random, sequences, countDists, addedSequences,
-					randomI);
+			final Transaction transaction = sampleFromDistribution(random, sequences, dists, addedSequences, randomI);
 			for (final int item : transaction) {
 				out.print(item + " -1 ");
 			}
@@ -159,13 +158,13 @@ public class TransactionGenerator {
 	 * subsequences
 	 */
 	public static Transaction sampleFromDistribution(final Random random, final Map<Sequence, Double> sequences,
-			final Map<Sequence, EnumeratedIntegerDistribution> countDists,
+			final Map<Sequence, EnumeratedIntegerDistribution> probabilities,
 			final HashMap<Sequence, Double> addedSequences, final Random randomI) {
 
 		// Sample counts for interesting sequences
 		final Multiset<Sequence> seqsWithRep = HashMultiset.create();
 		for (final Sequence seq : sequences.keySet()) {
-			final int count = countDists.get(seq).sample();
+			final int count = probabilities.get(seq).sample();
 			seqsWithRep.add(seq, count);
 		}
 

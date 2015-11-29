@@ -40,7 +40,7 @@ public abstract class TransactionDatabase {
 	// final JavaRDD<Transaction> updatedTransactions);
 
 	/** Get the number of transactions in this database */
-	public abstract long size();
+	public abstract int size();
 
 	/** Get cached transactions as String[] (for fast support counting) */
 	public abstract String[] getCachedDB();

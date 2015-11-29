@@ -2,11 +2,10 @@ package sequencemining.main;
 
 import java.io.Serializable;
 import java.util.BitSet;
-import java.util.HashMap;
-import java.util.Map.Entry;
 
 import com.google.common.collect.HashMultiset;
 import com.google.common.collect.Multiset;
+import com.google.common.collect.Table;
 
 import sequencemining.sequence.Sequence;
 import sequencemining.transaction.Transaction;
@@ -32,22 +31,18 @@ public class InferenceAlgorithms {
 		public Multiset<Sequence> infer(final Transaction transaction) {
 
 			final Multiset<Sequence> covering = HashMultiset.create();
-			;
 			int lenCovering = 0;
 			final int transactionSize = transaction.size();
 			final BitSet coveredItems = new BitSet(transactionSize);
 
-			final HashMap<Sequence, Double> cachedSequences = transaction.getCachedSequences();
+			final Table<Sequence, Integer, Double> cachedSequences = transaction.getCachedSequences();
 			while (coveredItems.cardinality() != transactionSize) {
 
 				double minCostPerItem = Double.POSITIVE_INFINITY;
 				Sequence bestSeq = null;
 				BitSet bestSeqCoveredItems = null;
 
-				for (final Entry<Sequence, Double> entry : cachedSequences.entrySet()) {
-
-					// Get sequence
-					final Sequence seq = entry.getKey();
+				for (final Sequence seq : cachedSequences.rowKeySet()) {
 
 					// How many additional items does sequence cover?
 					final BitSet seqCoveredItems = transaction.getCovered(seq, coveredItems);
@@ -55,7 +50,13 @@ public class InferenceAlgorithms {
 					if (seqCoveredItems.isEmpty())
 						continue;
 
-					final double cost = -Math.log(entry.getValue())
+					// Get seq multiplicity in covering
+					final int occur = covering.count(seq);
+
+					// TODO triple check that this is right!!!
+					// Calculate f(CuS) - f(C)
+					final double cost = -Math.log(cachedSequences.get(seq, occur + 1))
+							+ Math.log(cachedSequences.get(seq, occur))
 							+ sumLogRange(lenCovering + 1, lenCovering + seq.size()) - sumLogRange(1, seq.size());
 					final double costPerItem = cost / seq.size();
 

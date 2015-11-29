@@ -4,10 +4,10 @@ import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.counting;
 import static java.util.stream.Collectors.groupingBy;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 import com.google.common.collect.HashBasedTable;
 import com.google.common.collect.Multiset;
@@ -22,30 +22,38 @@ import sequencemining.transaction.TransactionDatabase;
 /** Class to hold the various transaction EM Steps */
 public class EMStep {
 
-	/** Initialize cached itemsets */
-	static void initializeCachedItemsets(final TransactionDatabase transactions, final Multiset<Sequence> singletons) {
-		final long noTransactions = transactions.size();
-		transactions.getTransactionList().parallelStream()
-				.forEach(t -> t.initializeCachedSequences(singletons, noTransactions));
+	/** Initialize cached sequences */
+	static void initializeCachedSequences(final TransactionDatabase transactions,
+			final Table<Sequence, Integer, Double> initProbs) {
+		transactions.getTransactionList().parallelStream().forEach(t -> t.initializeCachedSequences(initProbs));
 	}
 
 	/** EM-step for hard EM */
-	static Map<Sequence, Double> hardEMStep(final List<Transaction> transactions,
+	static Table<Sequence, Integer, Double> hardEMStep(final List<Transaction> transactions,
 			final InferenceAlgorithm inferenceAlgorithm) {
 		final double noTransactions = transactions.size();
 
 		// E-step
-		final Map<Sequence, Long> coveringWithCounts = transactions.parallelStream().map(t -> {
+		final Map<Multiset.Entry<Sequence>, Long> coveringWithCounts = transactions.parallelStream().map(t -> {
 			final Multiset<Sequence> covering = inferenceAlgorithm.infer(t);
 			t.setCachedCovering(covering);
-			return covering.elementSet();
+			return covering.entrySet();
 		}).flatMap(Set::stream).collect(groupingBy(identity(), counting()));
 
 		// M-step
-		final Map<Sequence, Double> newSequences = coveringWithCounts.entrySet().parallelStream()
-				.collect(Collectors.toMap(Map.Entry::getKey, v -> v.getValue() / noTransactions));
+		final Table<Sequence, Integer, Double> newSequences = coveringWithCounts.entrySet().parallelStream().collect(
+				HashBasedTable::create,
+				(t, e) -> t.put(e.getKey().getElement(), e.getKey().getCount(), e.getValue() / noTransactions),
+				Table::putAll);
+		// Add probabilities for zero occurrences
+		newSequences.rowKeySet().parallelStream().forEach(seq -> {
+			double rowSum = 0;
+			for (final Double count : newSequences.row(seq).values())
+				rowSum += count;
+			newSequences.put(seq, 0, 1 - rowSum);
+		});
 
-		// Update cached itemsets
+		// Update cached sequences
 		transactions.parallelStream().forEach(t -> t.updateCachedSequences(newSequences));
 
 		return newSequences;
@@ -60,24 +68,36 @@ public class EMStep {
 	}
 
 	/** EM-step for structural EM */
-	static Tuple2<Double, Double> structuralEMStep(final TransactionDatabase transactions,
+	static Tuple2<Double, Map<Integer, Double>> structuralEMStep(final TransactionDatabase transactions,
 			final InferenceAlgorithm inferenceAlgorithm, final Sequence candidate) {
 		final double noTransactions = transactions.size();
 
 		// E-step (adding candidate to transactions that support it)
-		final Map<Sequence, Long> coveringWithCounts = transactions.getTransactionList().parallelStream().map(t -> {
-			if (t.contains(candidate)) {
-				t.addSequenceCache(candidate, 1.0);
-				final Multiset<Sequence> covering = inferenceAlgorithm.infer(t);
-				t.setTempCachedCovering(covering);
-				return covering.elementSet();
-			}
-			return t.getCachedCovering().elementSet();
-		}).flatMap(Set::stream).collect(groupingBy(identity(), counting()));
+		final Map<Multiset.Entry<Sequence>, Long> coveringWithCounts = transactions.getTransactionList()
+				.parallelStream().map(t -> {
+					if (t.contains(candidate)) {
+						final Map<Integer, Double> initProb = new HashMap<>();
+						initProb.put(1, 1.0); // FIXME init. probs??
+						t.addSequenceCache(candidate, initProb);
+						final Multiset<Sequence> covering = inferenceAlgorithm.infer(t);
+						t.setTempCachedCovering(covering);
+						return covering.entrySet();
+					}
+					return t.getCachedCovering().entrySet();
+				}).flatMap(Set::stream).collect(groupingBy(identity(), counting()));
 
 		// M-step
-		final Map<Sequence, Double> newSequences = coveringWithCounts.entrySet().parallelStream()
-				.collect(Collectors.toMap(Map.Entry::getKey, v -> v.getValue() / noTransactions));
+		final Table<Sequence, Integer, Double> newSequences = coveringWithCounts.entrySet().parallelStream().collect(
+				HashBasedTable::create,
+				(t, e) -> t.put(e.getKey().getElement(), e.getKey().getCount(), e.getValue() / noTransactions),
+				Table::putAll);
+		// Add probabilities for zero occurrences
+		newSequences.rowKeySet().parallelStream().forEach(seq -> {
+			double rowSum = 0;
+			for (final Double count : newSequences.row(seq).values())
+				rowSum += count;
+			newSequences.put(seq, 0, 1 - rowSum);
+		});
 
 		// Get average cost (removing candidate from supported transactions)
 		final double averageCost = transactions.getTransactionList().parallelStream().map(t -> {
@@ -91,55 +111,45 @@ public class EMStep {
 		}).reduce(0., (sum, c) -> sum += c, (sum1, sum2) -> sum1 + sum2) / noTransactions;
 
 		// Get candidate prob
-		Double prob = newSequences.get(candidate);
-		if (prob == null)
-			prob = 0.;
+		final Map<Integer, Double> prob = newSequences.row(candidate);
 
-		return new Tuple2<Double, Double>(averageCost, prob);
+		return new Tuple2<Double, Map<Integer, Double>>(averageCost, prob);
 	}
 
 	/** Add accepted candidate itemset to cache */
-	static Map<Sequence, Double> addAcceptedCandidateCache(final TransactionDatabase transactions,
-			final Sequence candidate, final double prob) {
+	static Table<Sequence, Integer, Double> addAcceptedCandidateCache(final TransactionDatabase transactions,
+			final Sequence candidate, final Map<Integer, Double> prob) {
 		final double noTransactions = transactions.size();
 
 		// Cached E-step (adding candidate to transactions that support it)
-		final Map<Sequence, Long> coveringWithCounts = transactions.getTransactionList().parallelStream().map(t -> {
-			if (t.contains(candidate)) {
-				t.addSequenceCache(candidate, prob);
-				final Multiset<Sequence> covering = t.getTempCachedCovering();
-				t.setCachedCovering(covering);
-				return covering.elementSet();
-			}
-			return t.getCachedCovering().elementSet();
-		}).flatMap(Set::stream).collect(groupingBy(identity(), counting()));
+		final Map<Multiset.Entry<Sequence>, Long> coveringWithCounts = transactions.getTransactionList()
+				.parallelStream().map(t -> {
+					if (t.contains(candidate)) {
+						t.addSequenceCache(candidate, prob);
+						final Multiset<Sequence> covering = t.getTempCachedCovering();
+						t.setCachedCovering(covering);
+						return covering.entrySet();
+					}
+					return t.getCachedCovering().entrySet();
+				}).flatMap(Set::stream).collect(groupingBy(identity(), counting()));
 
 		// M-step
-		final Map<Sequence, Double> newSequences = coveringWithCounts.entrySet().parallelStream()
-				.collect(Collectors.toMap(Map.Entry::getKey, v -> v.getValue() / noTransactions));
+		final Table<Sequence, Integer, Double> newSequences = coveringWithCounts.entrySet().parallelStream().collect(
+				HashBasedTable::create,
+				(t, e) -> t.put(e.getKey().getElement(), e.getKey().getCount(), e.getValue() / noTransactions),
+				Table::putAll);
+		// Add probabilities for zero occurrences
+		newSequences.rowKeySet().parallelStream().forEach(seq -> {
+			double rowSum = 0;
+			for (final Double count : newSequences.row(seq).values())
+				rowSum += count;
+			newSequences.put(seq, 0, 1 - rowSum);
+		});
 
 		// Update cached itemsets
 		transactions.getTransactionList().parallelStream().forEach(t -> t.updateCachedSequences(newSequences));
 
 		return newSequences;
-	}
-
-	/** Get discrete distribution of counts */
-	static Table<Sequence, Integer, Double> getCountDistribution(final TransactionDatabase transactions) {
-		final double noTransactions = transactions.size();
-
-		// Get per transaction sequence counts
-		final Map<Multiset.Entry<Sequence>, Long> entryWithCounts = transactions.getTransactionList().parallelStream()
-				.map(t -> t.getCachedCovering().entrySet()).flatMap(Set::stream)
-				.collect(groupingBy(identity(), counting()));
-
-		// Collect into Table (Sequence x count : probability)
-		final Table<Sequence, Integer, Double> countDist = entryWithCounts.entrySet().parallelStream().collect(
-				HashBasedTable::create,
-				(t, e) -> t.put(e.getKey().getElement(), e.getKey().getCount(), e.getValue() / noTransactions),
-				Table::putAll);
-
-		return countDist;
 	}
 
 	private EMStep() {

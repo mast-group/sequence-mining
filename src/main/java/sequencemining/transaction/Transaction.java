@@ -3,13 +3,12 @@ package sequencemining.transaction;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 
+import com.google.common.collect.HashBasedTable;
 import com.google.common.collect.Multiset;
+import com.google.common.collect.Table;
 
 import sequencemining.sequence.AbstractSequence;
 import sequencemining.sequence.Sequence;
@@ -18,43 +17,44 @@ import sequencemining.sequence.Sequence;
 public class Transaction extends AbstractSequence implements Serializable {
 	private static final long serialVersionUID = 3327396055332538091L;
 
-	/** Cached itemsets for this transaction */
-	private HashMap<Sequence, Double> cachedSequences;
+	/** Cached sequences and probabilities for this transaction */
+	private Table<Sequence, Integer, Double> cachedSequences;
 
 	/** Cached covering for this transaction */
 	private Multiset<Sequence> cachedCovering;
 	private Multiset<Sequence> tempCachedCovering;
 
-	public void initializeCachedSequences(final Multiset<Sequence> singletons, final long noTransactions) {
-		cachedSequences = new HashMap<>();
-		for (final com.google.common.collect.Multiset.Entry<Sequence> entry : singletons.entrySet()) {
-			if (this.contains(entry.getElement()))
-				cachedSequences.put(entry.getElement(), entry.getCount() / (double) noTransactions);
+	public void initializeCachedSequences(final Table<Sequence, Integer, Double> initProbs) {
+		final Table<Sequence, Integer, Double> probs = HashBasedTable.create();
+		for (final Sequence seq : initProbs.rowKeySet()) {
+			if (this.contains(seq))
+				probs.row(seq).putAll(initProbs.row(seq));
 		}
+		cachedSequences = probs;
 	}
 
-	public HashMap<Sequence, Double> getCachedSequences() {
+	public Table<Sequence, Integer, Double> getCachedSequences() {
 		return cachedSequences;
 	}
 
-	public void addSequenceCache(final Sequence candidate, final double prob) {
-		cachedSequences.put(candidate, prob);
+	public void addSequenceCache(final Sequence candidate, final Map<Integer, Double> prob) {
+		cachedSequences.row(candidate).putAll(prob);
 	}
 
 	public void removeSequenceCache(final Sequence candidate) {
-		cachedSequences.remove(candidate);
+		cachedSequences.row(candidate).clear();
 	}
 
-	public void updateCachedSequences(final Map<Sequence, Double> newSequences) {
-		for (final Iterator<Entry<Sequence, Double>> it = cachedSequences.entrySet().iterator(); it.hasNext();) {
-			final Entry<Sequence, Double> entry = it.next();
-			final Double newProb = newSequences.get(entry.getKey());
-			if (newProb != null)
-				entry.setValue(newProb);
-			else if (entry.getKey().size() == 1)
-				entry.setValue(0.); // so we can fill incomplete coverings
-			else
-				it.remove();
+	public void updateCachedSequences(final Table<Sequence, Integer, Double> newSequences) {
+		for (final Sequence seq : cachedSequences.rowKeySet()) {
+			final double zeroProb = newSequences.get(seq, 0);
+			// seq.size() != 1 so we can fill incomplete coverings
+			if (seq.size() != 1 && (int) zeroProb == 1) {
+				cachedSequences.row(seq).clear();
+			} else {
+				cachedSequences.row(seq).clear();
+				cachedSequences.row(seq).putAll(newSequences.row(seq));
+			}
 		}
 	}
 
@@ -62,42 +62,49 @@ public class Transaction extends AbstractSequence implements Serializable {
 	public double getCachedCost() {
 		double totalCost = 0;
 		int lenCovering = 0;
-		for (final Entry<Sequence, Double> entry : cachedSequences.entrySet()) {
-			final Sequence seq = entry.getKey();
-			if (cachedCovering.contains(seq) && !entry.getValue().equals(0.)) {
-				totalCost += -Math.log(entry.getValue()) + sumLogRange(lenCovering + 1, lenCovering + seq.size())
-						- sumLogRange(1, seq.size());
-				lenCovering += seq.size();
+		// TODO triple check that this is right!!!
+		// Calculate (3.3)
+		for (final Sequence seq : cachedSequences.rowKeySet()) {
+			if (cachedCovering.contains(seq)) {
+				final int occur = cachedCovering.count(seq);
+				totalCost += -Math.log(cachedSequences.get(seq, occur));
+				for (int m = 1; m <= occur; m++) {
+					totalCost += sumLogRange(lenCovering + 1, lenCovering + seq.size()) - sumLogRange(1, seq.size());
+					lenCovering += seq.size();
+				}
 			} else
-				totalCost += -Math.log(1 - entry.getValue());
+				totalCost += -Math.log(cachedSequences.get(seq, 0));
 		}
 		return totalCost;
 	}
 
 	/** Get cost of cached covering for structural EM-step */
-	public double getCachedCost(final Map<Sequence, Double> sequences) {
+	public double getCachedCost(final Table<Sequence, Integer, Double> sequences) {
 		return calculateCachedCost(sequences, cachedCovering);
 	}
 
 	/** Get cost of temp. cached covering for structural EM-step */
-	public double getTempCachedCost(final Map<Sequence, Double> sequences) {
+	public double getTempCachedCost(final Table<Sequence, Integer, Double> sequences) {
 		return calculateCachedCost(sequences, tempCachedCovering);
 	}
 
 	/** Calculate cached cost for structural EM-step */
-	private double calculateCachedCost(final Map<Sequence, Double> sequences, final Multiset<Sequence> covering) {
+	private double calculateCachedCost(final Table<Sequence, Integer, Double> sequences,
+			final Multiset<Sequence> covering) {
 		double totalCost = 0;
 		int lenCovering = 0;
-		for (final Entry<Sequence, Double> entry : cachedSequences.entrySet()) {
-			final Sequence seq = entry.getKey();
-			final Double prob = sequences.get(seq);
-			if (prob != null) {
-				if (covering.contains(seq) && !entry.getValue().equals(0.)) {
-					totalCost += -Math.log(prob) + sumLogRange(lenCovering + 1, lenCovering + seq.size())
-							- sumLogRange(1, seq.size());
-					lenCovering += seq.size();
+		for (final Sequence seq : cachedSequences.rowKeySet()) {
+			if (sequences.containsColumn(seq)) {
+				if (covering.contains(seq)) {
+					final int occur = covering.count(seq);
+					totalCost += -Math.log(sequences.get(seq, occur));
+					for (int m = 1; m <= occur; m++) {
+						totalCost += sumLogRange(lenCovering + 1, lenCovering + seq.size())
+								- sumLogRange(1, seq.size());
+						lenCovering += seq.size();
+					}
 				} else
-					totalCost += -Math.log(1 - prob);
+					totalCost += -Math.log(sequences.get(seq, 0));
 			}
 		}
 		return totalCost;

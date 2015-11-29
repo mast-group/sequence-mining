@@ -16,8 +16,8 @@ import org.apache.commons.io.FileUtils;
 
 import com.google.common.base.Functions;
 import com.google.common.collect.ImmutableSortedMap;
-import com.google.common.collect.Multiset;
 import com.google.common.collect.Ordering;
+import com.google.common.collect.Table;
 
 import scala.Tuple2;
 import sequencemining.main.InferenceAlgorithms.InferenceAlgorithm;
@@ -41,31 +41,28 @@ public abstract class SequenceMiningCore {
 	/**
 	 * Learn itemsets model using structural EM
 	 */
-	protected static HashMap<Sequence, Double> structuralEM(final TransactionDatabase transactions,
-			final Multiset<Sequence> singletons, final InferenceAlgorithm inferenceAlgorithm,
+	protected static Table<Sequence, Integer, Double> structuralEM(final TransactionDatabase transactions,
+			final Table<Sequence, Integer, Double> sequences, final InferenceAlgorithm inferenceAlgorithm,
 			final int maxStructureSteps, final int maxEMIterations) {
 
 		// Start timer
 		final long startTime = System.currentTimeMillis();
 
-		// Initialize itemset cache
+		// Initialize sequence cache
 		// if (transactions instanceof TransactionRDD) {
 		// SparkEMStep.initializeCachedItemsets(transactions, singletons);
 		// } else {
-		EMStep.initializeCachedItemsets(transactions, singletons);
+		EMStep.initializeCachedSequences(transactions, sequences);
 		// }
 
-		// Intialize sequences with singleton seqs and their relative support
-		// as well as supports with singletons and their actual supports
-		final HashMap<Sequence, Double> sequences = new HashMap<>();
+		// Intialize supports with singletons and their actual supports
 		final HashMap<Sequence, Integer> supports = new HashMap<>();
-		for (final Multiset.Entry<Sequence> entry : singletons.entrySet()) {
-			final Sequence seq = entry.getElement();
-			final int support = entry.getCount();
-			sequences.put(seq, support / (double) transactions.size());
+		final int noTransactions = transactions.size();
+		for (final Sequence seq : sequences.rowKeySet()) {
+			final int support = (int) Math.round((1 - sequences.get(seq, 0)) * noTransactions);
 			supports.put(seq, support);
 		}
-		logger.fine(" Initial sequences: " + sequences + "\n");
+		logger.fine(" Initial sequences: " + probsToString(sequences) + "\n");
 
 		// Initialize list of rejected seqs
 		final Set<Sequence> rejected_seqs = new HashSet<>();
@@ -142,18 +139,18 @@ public abstract class SequenceMiningCore {
 	 *         <p>
 	 *         NB. zero probability sequences are dropped
 	 */
-	private static void expectationMaximizationStep(final HashMap<Sequence, Double> sequences,
+	private static void expectationMaximizationStep(final Table<Sequence, Integer, Double> sequences,
 			final TransactionDatabase transactions, final InferenceAlgorithm inferenceAlgorithm) {
 
-		logger.fine(" Structure Optimal Sequences: " + sequences + "\n");
+		logger.fine(" Structure Optimal Sequences: " + probsToString(sequences) + "\n");
 
-		Map<Sequence, Double> prevSequences = sequences;
+		Table<Sequence, Integer, Double> prevSequences = sequences;
 
 		double norm = 1;
 		while (norm > OPTIMIZE_TOL) {
 
 			// Set up storage
-			final Map<Sequence, Double> newSequences;
+			final Table<Sequence, Integer, Double> newSequences;
 
 			// Parallel E-step and M-step combined
 			// if (transactions instanceof TransactionRDD)
@@ -163,10 +160,12 @@ public abstract class SequenceMiningCore {
 			newSequences = EMStep.hardEMStep(transactions.getTransactionList(), inferenceAlgorithm);
 
 			// If set has stabilised calculate norm(p_prev - p_new)
-			if (prevSequences.keySet().equals(newSequences.keySet())) {
+			if (prevSequences.rowKeySet().equals(newSequences.rowKeySet())) {
 				norm = 0;
-				for (final Sequence seq : prevSequences.keySet()) {
-					norm += Math.pow(prevSequences.get(seq) - newSequences.get(seq), 2);
+				for (final Sequence seq : prevSequences.rowKeySet()) {
+					for (final int occur : prevSequences.row(seq).keySet()) {
+						norm += Math.pow(prevSequences.get(seq, occur) - newSequences.get(seq, occur), 2);
+					}
 				}
 				norm = Math.sqrt(norm);
 			}
@@ -182,7 +181,7 @@ public abstract class SequenceMiningCore {
 
 		sequences.clear();
 		sequences.putAll(prevSequences);
-		logger.fine(" Parameter Optimal Sequences: " + sequences + "\n");
+		logger.fine(" Parameter Optimal Sequences: " + probsToString(sequences) + "\n");
 		logger.fine(String.format(" Average cost: %.2f%n", transactions.getAverageCost()));
 	}
 
@@ -199,7 +198,7 @@ public abstract class SequenceMiningCore {
 	 * @param candidateSupports
 	 *            cached candididate supports for the above ordering
 	 */
-	private static void combineSequencesStep(final HashMap<Sequence, Double> sequences,
+	private static void combineSequencesStep(final Table<Sequence, Integer, Double> sequences,
 			final TransactionDatabase transactions, final Set<Sequence> rejected_seqs,
 			final InferenceAlgorithm inferenceAlgorithm, final int maxSteps,
 			final Ordering<Sequence> sequenceSupportOrdering, final HashMap<Sequence, Integer> supports,
@@ -209,7 +208,7 @@ public abstract class SequenceMiningCore {
 		final PriorityQueue<Sequence> candidateQueue = new PriorityQueue<Sequence>(maxSteps, candidateSupportOrdering);
 
 		// Sort sequences according to given ordering
-		final ArrayList<Sequence> sortedSequences = new ArrayList<>(sequences.keySet());
+		final ArrayList<Sequence> sortedSequences = new ArrayList<>(sequences.rowKeySet());
 		Collections.sort(sortedSequences, sequenceSupportOrdering);
 
 		// Find maxSteps superseqs for all seqs
@@ -275,14 +274,14 @@ public abstract class SequenceMiningCore {
 	}
 
 	/** Evaluate a candidate sequence to see if it should be included */
-	private static boolean evaluateCandidate(final HashMap<Sequence, Double> sequences,
+	private static boolean evaluateCandidate(final Table<Sequence, Integer, Double> sequences,
 			final TransactionDatabase transactions, final InferenceAlgorithm inferenceAlgorithm,
 			final Sequence candidate) {
 
 		logger.finer("\n Candidate: " + candidate);
 
 		// Find cost in parallel
-		Tuple2<Double, Double> costAndProb;
+		Tuple2<Double, Map<Integer, Double>> costAndProb;
 		// if (transactions instanceof TransactionRDD) {
 		// costAndProb = SparkEMStep.structuralEMStep(transactions,
 		// inferenceAlgorithm, candidate);
@@ -290,14 +289,14 @@ public abstract class SequenceMiningCore {
 		costAndProb = EMStep.structuralEMStep(transactions, inferenceAlgorithm, candidate);
 		// }
 		final double curCost = costAndProb._1;
-		final double prob = costAndProb._2;
+		final Map<Integer, Double> prob = costAndProb._2;
 		logger.finer(String.format(", cost: %.2f", curCost));
 
 		// Return if better collection of seqs found
 		if (curCost < transactions.getAverageCost()) {
 			logger.finer("\n Candidate Accepted.\n");
 			// Update cache with candidate
-			Map<Sequence, Double> newSequences;
+			Table<Sequence, Integer, Double> newSequences;
 			// if (transactions instanceof TransactionRDD) {
 			// newItemsets = SparkEMStep.addAcceptedCandidateCache(
 			// transactions, candidate, prob);
@@ -328,8 +327,9 @@ public abstract class SequenceMiningCore {
 	}
 
 	/**
-	 * Calculate interestingness as defined by i(S) = |z_S = 1|/|T : S in T|
-	 * where |z_S = 1| is calculated by pi_S*|T| and |T : S in T| = supp(S)
+	 * Calculate interestingness as defined by i(S) = |z_S >= 1|/|T : S in T|
+	 * where |z_S >= 1| is calculated by (1-pi_S_0)*|T| and |T : S in T| =
+	 * supp(S)
 	 */
 	public static HashMap<Sequence, Double> calculateInterestingness(final HashMap<Sequence, Double> sequences,
 			final TransactionDatabase transactions) {
@@ -396,6 +396,25 @@ public abstract class SequenceMiningCore {
 		}
 
 		return support;
+	}
+
+	/** Pretty printing of sequence probabilities */
+	public static String probsToString(final Table<Sequence, Integer, Double> probs) {
+		final StringBuilder sb = new StringBuilder();
+		String prefix = "";
+		sb.append("{");
+		for (final Sequence seq : probs.rowKeySet()) {
+			sb.append(prefix + seq + "=(");
+			String prefix2 = "";
+			for (final Double prob : probs.row(seq).values()) {
+				sb.append(prefix2 + prob);
+				prefix2 = ",";
+			}
+			sb.append(")");
+			prefix = ",";
+		}
+		sb.append("}");
+		return sb.toString();
 	}
 
 }

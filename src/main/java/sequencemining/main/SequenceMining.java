@@ -20,6 +20,7 @@ import com.beust.jcommander.JCommander;
 import com.beust.jcommander.Parameter;
 import com.beust.jcommander.ParameterException;
 import com.google.common.base.Charsets;
+import com.google.common.collect.HashBasedTable;
 import com.google.common.collect.HashMultiset;
 import com.google.common.collect.Multiset;
 import com.google.common.collect.Table;
@@ -113,20 +114,25 @@ public class SequenceMining extends SequenceMiningCore {
 		// Read in transaction database
 		final TransactionList transactions = readTransactions(inputFile);
 
-		// Determine most frequent singletons
-		final Multiset<Sequence> singletons = scanDatabaseToDetermineFrequencyOfSingleItems(inputFile);
+		// Determine initial probabilities
+		final Table<Sequence, Integer, Double> initProbs = scanDatabaseToDetermineInitialProbabilities(inputFile);
 
 		// Run inference to find interesting sequences
 		logger.fine("\n============= SEQUENCE INFERENCE =============\n");
-		final HashMap<Sequence, Double> sequences = structuralEM(transactions, singletons, inferenceAlgorithm,
+		final Table<Sequence, Integer, Double> sequences = structuralEM(transactions, initProbs, inferenceAlgorithm,
 				maxStructureSteps, maxEMIterations);
 		if (LOG_LEVEL.equals(Level.FINEST))
 			logger.finest(
 					"\n======= Transaction Database =======\n" + Files.toString(inputFile, Charsets.UTF_8) + "\n");
 
+		// Calculate probabilities: p(S \in X) = p(z_S >= 1) = 1 - \pi_S_0
+		final HashMap<Sequence, Double> sequenceMap = new HashMap<>();
+		for (final Sequence seq : sequences.rowKeySet())
+			sequenceMap.put(seq, 1 - sequences.get(seq, 0));
+
 		// Sort sequences by interestingness
-		final HashMap<Sequence, Double> intMap = calculateInterestingness(sequences, transactions);
-		final Map<Sequence, Double> sortedSequences = sortSequences(sequences, intMap);
+		final HashMap<Sequence, Double> intMap = calculateInterestingness(sequenceMap, transactions);
+		final Map<Sequence, Double> sortedSequences = sortSequences(sequenceMap, intMap);
 
 		logger.info("\n============= INTERESTING SEQUENCES =============\n");
 		for (final Entry<Sequence, Double> entry : sortedSequences.entrySet()) {
@@ -137,8 +143,7 @@ public class SequenceMining extends SequenceMiningCore {
 
 		// Optionally save sequence count distribution
 		if (saveCountDist) {
-			final Table<Sequence, Integer, Double> countDist = EMStep.getCountDistribution(transactions);
-			Logging.serialize(countDist, FilenameUtils.removeExtension(logFile.getAbsolutePath()) + ".dist");
+			Logging.serialize(sequences, FilenameUtils.removeExtension(logFile.getAbsolutePath()) + ".dist");
 		}
 
 		return sortedSequences;
@@ -200,25 +205,26 @@ public class SequenceMining extends SequenceMiningCore {
 	}
 
 	/**
-	 * This method scans the input database to calculate the support of single
-	 * items.
+	 * This method scans the input database to determine the initial
+	 * probabilities of single items
 	 *
 	 * @param inputFile
 	 *            the input file
-	 * @return a multiset for storing the support of each singleton
+	 * @return class storing the support of every occurrence of each singleton
 	 */
-	public static Multiset<Sequence> scanDatabaseToDetermineFrequencyOfSingleItems(final File inputFile)
+	public static Table<Sequence, Integer, Double> scanDatabaseToDetermineInitialProbabilities(final File inputFile)
 			throws IOException {
 
-		final Multiset<Sequence> singletons = HashMultiset.create();
+		// Sequence x occurence x count
+		final Table<Sequence, Integer, Double> supports = HashBasedTable.create();
 
 		// for each line (transaction) until the end of file
+		int noTransactions = 0;
 		final LineIterator it = FileUtils.lineIterator(inputFile, "UTF-8");
 		while (it.hasNext()) {
 
 			final String line = it.nextLine();
-			// if the line is a comment, is empty or is a
-			// kind of metadata
+			// if the line is a comment, is empty or is a kind of metadata
 			if (line.isEmpty() == true || line.charAt(0) == '#' || line.charAt(0) == '%' || line.charAt(0) == '@') {
 				continue;
 			}
@@ -226,19 +232,49 @@ public class SequenceMining extends SequenceMiningCore {
 			// split the line into items
 			final String[] lineSplit = line.split(" ");
 			// for each item
+			final Multiset<Sequence> seenItems = HashMultiset.create();
 			for (final String itemString : lineSplit) {
 				final int item = Integer.parseInt(itemString);
-				if (item >= 0) { // ignore end of itemset/sequence tags
-					// increase the support count of the item
-					singletons.add(new Sequence(item));
+				if (item >= 0) // ignore end of itemset/sequence tags
+					seenItems.add(new Sequence(item));
+			}
+			// increase the support count of the items
+			for (final Sequence seq : seenItems.elementSet()) {
+				final int occur = seenItems.count(seq);
+				if (supports.contains(seq, occur)) {
+					final double supp = supports.get(seq, occur);
+					supports.put(seq, occur, supp + 1);
+				} else {
+					supports.put(seq, occur, 1.);
 				}
 			}
+
+			noTransactions++;
 		}
 
 		// close the input file
 		LineIterator.closeQuietly(it);
 
-		return singletons;
+		// Add counts for zero occurrences
+		for (final Sequence seq : supports.rowKeySet()) {
+			double rowSum = 0;
+			for (final Double count : supports.row(seq).values())
+				rowSum += count;
+			supports.put(seq, 0, noTransactions - rowSum);
+		}
+
+		// Normalize
+		for (final Sequence seq : supports.rowKeySet()) {
+			double rowSum = 0;
+			for (final Double prob : supports.row(seq).values())
+				rowSum += prob;
+			for (final Integer occur : supports.row(seq).keySet()) {
+				final double normProb = supports.get(seq, occur) / rowSum;
+				supports.put(seq, occur, normProb);
+			}
+		}
+
+		return supports;
 	}
 
 	/** Convert string level to level class */

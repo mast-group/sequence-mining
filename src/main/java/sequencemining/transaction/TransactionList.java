@@ -8,8 +8,7 @@ public class TransactionList extends TransactionDatabase {
 	private final List<Transaction> transactions;
 	private final String[] cachedDB;
 
-	public TransactionList(final List<Transaction> transactions,
-			final String[] cachedDB) {
+	public TransactionList(final List<Transaction> transactions, final String[] cachedDB) {
 		this.transactions = transactions;
 		this.cachedDB = cachedDB;
 	}
@@ -25,7 +24,7 @@ public class TransactionList extends TransactionDatabase {
 	// }
 
 	@Override
-	public long size() {
+	public int size() {
 		return transactions.size();
 	}
 
