@@ -13,6 +13,9 @@ import java.util.Set;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.io.output.TeeOutputStream;
 
+import com.google.common.base.Functions;
+import com.google.common.collect.ImmutableSortedMap;
+import com.google.common.collect.Ordering;
 import com.google.common.collect.Sets;
 import com.google.common.collect.Table;
 
@@ -72,8 +75,7 @@ public class BackgroundPrecisionRecall {
 			throws IOException {
 
 		// Set up logging
-		final FileOutputStream outFile = new FileOutputStream(
-				saveDir + "/" + algorithm + "_Markov_" + name + "_pr.txt");
+		final FileOutputStream outFile = new FileOutputStream(saveDir + "/" + algorithm + "_" + name + "_pr.txt");
 		final TeeOutputStream out = new TeeOutputStream(System.out, outFile);
 		final PrintStream ps = new PrintStream(out);
 		System.setOut(ps);
@@ -87,8 +89,11 @@ public class BackgroundPrecisionRecall {
 					minSup);
 			minedSequences = FrequentSequenceMining.readFrequentSequences(logFile).keySet();
 		} else if (algorithm.equals("ISM")) {
-			minedSequences = SequenceMining
-					.mineSequences(dbFile, new InferGreedy(), maxStructureSteps, noIterations, logFile, false).keySet();
+			final Map<Sequence, Double> minedIntSeqs = SequenceMining.mineSequences(dbFile, new InferGreedy(),
+					maxStructureSteps, noIterations, logFile, false);
+			final Ordering<Sequence> comparator = Ordering.natural().reverse()
+					.onResultOf(Functions.forMap(minedIntSeqs)).compound(Ordering.usingToString());
+			minedSequences = ImmutableSortedMap.copyOf(minedIntSeqs, comparator).keySet();
 		} else if (algorithm.equals("GoKrimp")) {
 			minedSequences = StatisticalSequenceMining.mineGoKrimpSequences(dbFile, logFile).keySet();
 		} else if (algorithm.equals("SQS")) {
@@ -123,7 +128,7 @@ public class BackgroundPrecisionRecall {
 		System.out.println("\n======== " + name + " ========");
 		System.out.println("Time: " + time);
 		System.out.println("Precision (all): " + Arrays.toString(precision));
-		System.out.println("Recall (special): " + Arrays.toString(recall));
+		System.out.println("Recall (all): " + Arrays.toString(recall));
 
 	}
 

@@ -13,6 +13,9 @@ import java.util.Set;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.io.output.TeeOutputStream;
 
+import com.google.common.base.Functions;
+import com.google.common.collect.ImmutableSortedMap;
+import com.google.common.collect.Ordering;
 import com.google.common.collect.Sets;
 import com.google.common.collect.Table;
 
@@ -100,8 +103,11 @@ public class SequencePrecisionRecall {
 					minSup);
 			minedSequences = FrequentSequenceMining.readFrequentSequences(logFile).keySet();
 		} else if (algorithm.equals("ISM")) {
-			minedSequences = SequenceMining
-					.mineSequences(dbFile, new InferGreedy(), maxStructureSteps, noIterations, logFile, false).keySet();
+			final Map<Sequence, Double> minedIntSeqs = SequenceMining.mineSequences(dbFile, new InferGreedy(),
+					maxStructureSteps, noIterations, logFile, false);
+			final Ordering<Sequence> comparator = Ordering.natural().reverse()
+					.onResultOf(Functions.forMap(minedIntSeqs)).compound(Ordering.usingToString());
+			minedSequences = ImmutableSortedMap.copyOf(minedIntSeqs, comparator).keySet();
 		} else if (algorithm.equals("GoKrimp")) {
 			minedSequences = StatisticalSequenceMining.mineGoKrimpSequences(dbFile, logFile).keySet();
 		} else if (algorithm.equals("SQS")) {

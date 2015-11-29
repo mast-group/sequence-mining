@@ -18,7 +18,7 @@ public class StatisticalSequenceMining {
 	public static void main(final String[] args) throws IOException {
 
 		// Datasets
-		final String[] datasets = new String[] { "alice_punc", "jmlr", "libraries_filtered" };
+		final String[] datasets = new String[] { "libraries_filtered" };
 		for (int i = 0; i < datasets.length; i++) {
 			final File dbPath = new File(
 					"/afs/inf.ed.ac.uk/user/j/jfowkes/Code/Sequences/Datasets/Paper/" + datasets[i] + ".dat");
