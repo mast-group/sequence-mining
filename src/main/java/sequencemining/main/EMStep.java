@@ -5,10 +5,10 @@ import static java.util.stream.Collectors.counting;
 import static java.util.stream.Collectors.groupingBy;
 
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 import com.google.common.collect.HashBasedTable;
 import com.google.common.collect.Multiset;
@@ -78,11 +78,13 @@ public class EMStep {
 			final InferenceAlgorithm inferenceAlgorithm, final Sequence candidate) {
 		final double noTransactions = transactions.size();
 
-		// Calculate empirical probability of candidate (like miniature EM step)
-		final Map<Integer, Long> repetitionsWithCounts = transactions.getTransactionList().parallelStream()
-				.map(t -> t.repetitions(candidate)).collect(groupingBy(identity(), counting()));
-		final Map<Integer, Double> initProb = repetitionsWithCounts.entrySet().parallelStream()
-				.collect(Collectors.toMap(Map.Entry::getKey, v -> v.getValue() / noTransactions));
+		// Calculate max. no. of candidate occurrences
+		final int maxReps = transactions.getTransactionList().parallelStream().mapToInt(t -> t.repetitions(candidate))
+				.max().getAsInt();
+		final Map<Integer, Double> initProb = new HashMap<>();
+		initProb.put(0, 0.);
+		for (int occur = 1; occur <= maxReps; occur++)
+			initProb.put(occur, 1. / maxReps);
 
 		// E-step (adding candidate to transactions that support it)
 		final Map<Multiset.Entry<Sequence>, Long> coveringWithCounts = transactions.getTransactionList()
