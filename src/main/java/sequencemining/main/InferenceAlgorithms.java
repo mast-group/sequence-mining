@@ -55,9 +55,10 @@ public class InferenceAlgorithms {
 
 					// TODO triple check that this is right!!!
 					// Calculate f(CuS) - f(C)
-					final double cost = -Math.log(cachedSequences.get(seq, occur + 1))
-							+ Math.log(cachedSequences.get(seq, occur))
+					double cost = -Math.log(cachedSequences.get(seq, occur + 1))
 							+ sumLogRange(lenCovering + 1, lenCovering + seq.size()) - sumLogRange(1, seq.size());
+					if (occur != 0)
+						cost += Math.log(cachedSequences.get(seq, occur));
 					final double costPerItem = cost / seq.size();
 
 					if (costPerItem < minCostPerItem) {
