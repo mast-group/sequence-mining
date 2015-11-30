@@ -22,7 +22,6 @@ import com.google.common.collect.Table;
 import scala.Tuple2;
 import sequencemining.main.InferenceAlgorithms.InferenceAlgorithm;
 import sequencemining.sequence.Sequence;
-import sequencemining.transaction.Transaction;
 import sequencemining.transaction.TransactionDatabase;
 
 public abstract class SequenceMiningCore {
@@ -164,7 +163,10 @@ public abstract class SequenceMiningCore {
 				norm = 0;
 				for (final Sequence seq : prevSequences.rowKeySet()) {
 					for (final int occur : prevSequences.row(seq).keySet()) {
-						norm += Math.pow(prevSequences.get(seq, occur) - newSequences.get(seq, occur), 2);
+						Double newProb = newSequences.get(seq, occur);
+						if (newProb == null)
+							newProb = 0.; // Empty multiplicities have zero prob
+						norm += Math.pow(prevSequences.get(seq, occur) - newProb, 2);
 					}
 				}
 				norm = Math.sqrt(norm);
@@ -228,7 +230,7 @@ public abstract class SequenceMiningCore {
 						// Add candidate to queue
 						if (cand != null && !rejected_seqs.contains(cand)) {
 							if (!candidateSupports.containsKey(cand))
-								candidateSupports.put(cand, getSupportOfSequence(transactions, cand));
+								candidateSupports.put(cand, EMStep.getSupportOfSequence(transactions, cand));
 							candidateQueue.add(cand);
 							iteration++;
 						}
@@ -340,7 +342,7 @@ public abstract class SequenceMiningCore {
 		final long noTransactions = transactions.size();
 		for (final Sequence seq : sequences.keySet()) {
 			final double interestingness = sequences.get(seq) * noTransactions
-					/ (double) getSupportOfSequence(transactions, seq);
+					/ (double) EMStep.getSupportOfSequence(transactions, seq);
 			interestingnessMap.put(seq, interestingness);
 		}
 
@@ -379,23 +381,6 @@ public abstract class SequenceMiningCore {
 		final Map<Sequence, Double> sortedSequences = sortSequences(sequences, intMap);
 
 		return sortedSequences;
-	}
-
-	/**
-	 * This method scans the cached input database to calculate the support of a
-	 * sequence.
-	 *
-	 * @return the support of the requested sequence
-	 */
-	public static int getSupportOfSequence(final TransactionDatabase transactions, final Sequence seq) {
-
-		int support = 0;
-		for (final Transaction trans : transactions.getTransactionList()) {
-			if (trans.contains(seq))
-				support++;
-		}
-
-		return support;
 	}
 
 	/** Pretty printing of sequence probabilities */

@@ -4,10 +4,11 @@ import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.counting;
 import static java.util.stream.Collectors.groupingBy;
 
-import java.util.HashMap;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import com.google.common.collect.HashBasedTable;
 import com.google.common.collect.Multiset;
@@ -45,8 +46,13 @@ public class EMStep {
 				HashBasedTable::create,
 				(t, e) -> t.put(e.getKey().getElement(), e.getKey().getCount(), e.getValue() / noTransactions),
 				Table::putAll);
-		// Add probabilities for zero occurrences
 		newSequences.rowKeySet().parallelStream().forEach(seq -> {
+			// Pad with zero counts for non-occurrences
+			final int maxOccur = Collections.max(newSequences.row(seq).keySet());
+			for (int occur = 1; occur <= maxOccur; occur++) {
+				if (!newSequences.contains(seq, occur))
+					newSequences.put(seq, occur, 0.);
+			} // Add probabilities for zero occurrences
 			double rowSum = 0;
 			for (final Double count : newSequences.row(seq).values())
 				rowSum += count;
@@ -62,8 +68,8 @@ public class EMStep {
 	/** Get average cost of last EM-step */
 	static void calculateAndSetAverageCost(final TransactionDatabase transactions) {
 		final double noTransactions = transactions.size();
-		final double averageCost = transactions.getTransactionList().parallelStream().map(Transaction::getCachedCost)
-				.reduce(0., (sum, c) -> sum += c, (sum1, sum2) -> sum1 + sum2) / noTransactions;
+		final double averageCost = transactions.getTransactionList().parallelStream()
+				.mapToDouble(Transaction::getCachedCost).sum() / noTransactions;
 		transactions.setAverageCost(averageCost);
 	}
 
@@ -72,12 +78,16 @@ public class EMStep {
 			final InferenceAlgorithm inferenceAlgorithm, final Sequence candidate) {
 		final double noTransactions = transactions.size();
 
+		// Calculate empirical probability of candidate (like miniature EM step)
+		final Map<Integer, Long> repetitionsWithCounts = transactions.getTransactionList().parallelStream()
+				.map(t -> t.repetitions(candidate)).collect(groupingBy(identity(), counting()));
+		final Map<Integer, Double> initProb = repetitionsWithCounts.entrySet().parallelStream()
+				.collect(Collectors.toMap(Map.Entry::getKey, v -> v.getValue() / noTransactions));
+
 		// E-step (adding candidate to transactions that support it)
 		final Map<Multiset.Entry<Sequence>, Long> coveringWithCounts = transactions.getTransactionList()
 				.parallelStream().map(t -> {
 					if (t.contains(candidate)) {
-						final Map<Integer, Double> initProb = new HashMap<>();
-						initProb.put(1, 1.0); // FIXME init. probs??
 						t.addSequenceCache(candidate, initProb);
 						final Multiset<Sequence> covering = inferenceAlgorithm.infer(t);
 						t.setTempCachedCovering(covering);
@@ -91,8 +101,13 @@ public class EMStep {
 				HashBasedTable::create,
 				(t, e) -> t.put(e.getKey().getElement(), e.getKey().getCount(), e.getValue() / noTransactions),
 				Table::putAll);
-		// Add probabilities for zero occurrences
 		newSequences.rowKeySet().parallelStream().forEach(seq -> {
+			// Pad with zero counts for non-occurrences
+			final int maxOccur = Collections.max(newSequences.row(seq).keySet());
+			for (int occur = 1; occur <= maxOccur; occur++) {
+				if (!newSequences.contains(seq, occur))
+					newSequences.put(seq, occur, 0.);
+			} // Add probabilities for zero occurrences
 			double rowSum = 0;
 			for (final Double count : newSequences.row(seq).values())
 				rowSum += count;
@@ -100,7 +115,7 @@ public class EMStep {
 		});
 
 		// Get average cost (removing candidate from supported transactions)
-		final double averageCost = transactions.getTransactionList().parallelStream().map(t -> {
+		final double averageCost = transactions.getTransactionList().parallelStream().mapToDouble(t -> {
 			double cost;
 			if (t.contains(candidate))
 				cost = t.getTempCachedCost(newSequences);
@@ -108,7 +123,7 @@ public class EMStep {
 				cost = t.getCachedCost(newSequences);
 			t.removeSequenceCache(candidate);
 			return cost;
-		}).reduce(0., (sum, c) -> sum += c, (sum1, sum2) -> sum1 + sum2) / noTransactions;
+		}).sum() / noTransactions;
 
 		// Get candidate prob
 		final Map<Integer, Double> prob = newSequences.row(candidate);
@@ -138,8 +153,13 @@ public class EMStep {
 				HashBasedTable::create,
 				(t, e) -> t.put(e.getKey().getElement(), e.getKey().getCount(), e.getValue() / noTransactions),
 				Table::putAll);
-		// Add probabilities for zero occurrences
 		newSequences.rowKeySet().parallelStream().forEach(seq -> {
+			// Pad with zero counts for non-occurrences
+			final int maxOccur = Collections.max(newSequences.row(seq).keySet());
+			for (int occur = 1; occur <= maxOccur; occur++) {
+				if (!newSequences.contains(seq, occur))
+					newSequences.put(seq, occur, 0.);
+			} // Add probabilities for zero occurrences
 			double rowSum = 0;
 			for (final Double count : newSequences.row(seq).values())
 				rowSum += count;
@@ -150,6 +170,16 @@ public class EMStep {
 		transactions.getTransactionList().parallelStream().forEach(t -> t.updateCachedSequences(newSequences));
 
 		return newSequences;
+	}
+
+	/** Get the support of requested sequence */
+	static int getSupportOfSequence(final TransactionDatabase transactions, final Sequence seq) {
+		return transactions.getTransactionList().parallelStream().mapToInt(t -> {
+			for (final Transaction trans : transactions.getTransactionList())
+				if (trans.contains(seq))
+					return 1;
+			return 0;
+		}).sum();
 	}
 
 	private EMStep() {

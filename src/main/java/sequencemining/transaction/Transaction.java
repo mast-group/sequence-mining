@@ -3,8 +3,10 @@ package sequencemining.transaction;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 
 import com.google.common.collect.HashBasedTable;
 import com.google.common.collect.Multiset;
@@ -46,15 +48,17 @@ public class Transaction extends AbstractSequence implements Serializable {
 	}
 
 	public void updateCachedSequences(final Table<Sequence, Integer, Double> newSequences) {
-		for (final Sequence seq : cachedSequences.rowKeySet()) {
-			final double zeroProb = newSequences.get(seq, 0);
-			// seq.size() != 1 so we can fill incomplete coverings
-			if (seq.size() != 1 && (int) zeroProb == 1) {
-				cachedSequences.row(seq).clear();
-			} else {
-				cachedSequences.row(seq).clear();
+		for (final Iterator<Sequence> it = cachedSequences.rowKeySet().iterator(); it.hasNext();) {
+			final Sequence seq = it.next();
+			if (newSequences.containsRow(seq)) { // TODO zeros to clear ok?
+				for (final Entry<Integer, Double> entry : cachedSequences.row(seq).entrySet())
+					entry.setValue(0.);
 				cachedSequences.row(seq).putAll(newSequences.row(seq));
-			}
+			} else if (seq.size() == 1) {
+				for (final Entry<Integer, Double> entry : cachedSequences.row(seq).entrySet())
+					entry.setValue(0.); // so we can fill incomplete coverings
+			} else
+				it.remove();
 		}
 	}
 
@@ -94,7 +98,7 @@ public class Transaction extends AbstractSequence implements Serializable {
 		double totalCost = 0;
 		int lenCovering = 0;
 		for (final Sequence seq : cachedSequences.rowKeySet()) {
-			if (sequences.containsColumn(seq)) {
+			if (sequences.containsRow(seq)) {
 				if (covering.contains(seq)) {
 					final int occur = covering.count(seq);
 					totalCost += -Math.log(sequences.get(seq, occur));

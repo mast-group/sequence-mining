@@ -7,7 +7,7 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 
-public abstract class AbstractSequence extends AbstractCollection<Integer>implements Serializable {
+public abstract class AbstractSequence extends AbstractCollection<Integer> implements Serializable {
 	private static final long serialVersionUID = 686688001826219278L;
 
 	protected List<Integer> items;
@@ -87,6 +87,34 @@ public abstract class AbstractSequence extends AbstractCollection<Integer>implem
 				return false;
 		}
 		return true;
+	}
+
+	/**
+	 * Return number of times this sequence contains given sequence (allowing
+	 * gaps)
+	 *
+	 * @param sequence
+	 * @return number of times given sequence is contained in this one
+	 */
+	public int repetitions(final Sequence seq) {
+		int count = 0;
+		int pos = 0;
+		while (true) {
+			boolean containsItem;
+			for (final int item : seq.items) {
+				containsItem = false;
+				for (int i = pos; i < this.items.size(); i++) {
+					if (this.items.get(i) == item) {
+						pos = i + 1;
+						containsItem = true;
+						break;
+					}
+				}
+				if (!containsItem)
+					return count;
+			}
+			count++;
+		}
 	}
 
 	/** Code for covering sequences *without gaps* */

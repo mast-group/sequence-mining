@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -40,10 +41,10 @@ public class SequenceMining extends SequenceMiningCore {
 
 		@Parameter(names = { "-f", "--file" }, description = "Dataset filename")
 		private final File dataset = new File(
-				"/afs/inf.ed.ac.uk/user/j/jfowkes/Code/Sequences/Datasets/API/java/java.dat");
+				"/afs/inf.ed.ac.uk/user/j/jfowkes/Code/Sequences/Datasets/Paper/jmlr.dat");
 
 		@Parameter(names = { "-s", "--maxSteps" }, description = "Max structure steps")
-		int maxStructureSteps = 1_000_000;
+		int maxStructureSteps = 1_000;
 
 		@Parameter(names = { "-i", "--iterations" }, description = "Max iterations")
 		int maxEMIterations = 1_000;
@@ -255,8 +256,13 @@ public class SequenceMining extends SequenceMiningCore {
 		// close the input file
 		LineIterator.closeQuietly(it);
 
-		// Add counts for zero occurrences
 		for (final Sequence seq : supports.rowKeySet()) {
+			// Pad with zero counts for non-occurrences
+			final int maxOccur = Collections.max(supports.row(seq).keySet());
+			for (int occur = 1; occur <= maxOccur; occur++) {
+				if (!supports.contains(seq, occur))
+					supports.put(seq, occur, 0.);
+			} // Add counts for zero occurrences
 			double rowSum = 0;
 			for (final Double count : supports.row(seq).values())
 				rowSum += count;

@@ -55,6 +55,23 @@ public class SequenceTest {
 	// }
 
 	@Test
+	public void testSequenceRepetitionsWithGaps() {
+
+		// Test transaction contains repetitions
+		final Transaction trans1 = new Transaction(1, 2, 1, 2);
+		final Transaction trans2 = new Transaction(3, 1, 4, 2, 5);
+		final Transaction trans3 = new Transaction(3, 1, 4, 2, 5, 1, 6, 2, 7);
+		final Transaction trans4 = new Transaction(1, 4, 5);
+		final Sequence seq = new Sequence(1, 2);
+
+		assertEquals(2, trans1.repetitions(seq));
+		assertEquals(1, trans2.repetitions(seq));
+		assertEquals(2, trans3.repetitions(seq));
+		assertEquals(0, trans4.repetitions(seq));
+
+	}
+
+	@Test
 	public void testSequenceContainsWithGaps() {
 
 		// Example from Agrawal paper
