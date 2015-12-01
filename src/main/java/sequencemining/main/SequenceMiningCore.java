@@ -220,7 +220,7 @@ public abstract class SequenceMiningCore {
 		outerLoop: for (int k = 0; k < 2 * len - 2; k++) {
 			for (int i = 0; i < len && i < k + 1; i++) {
 				for (int j = 0; j < len && i + j < k + 1; j++) {
-					if (k <= i + j) {
+					if (k <= i + j && i != j) {
 
 						// Create new candidates by joining seqs
 						final Sequence seq1 = sortedSequences.get(i);
