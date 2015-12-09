@@ -84,7 +84,7 @@ public class EMStep {
 		final Map<Integer, Double> initProb = new HashMap<>();
 		initProb.put(0, 0.);
 		for (int occur = 1; occur <= maxReps; occur++)
-			initProb.put(occur, 1. / maxReps);
+			initProb.put(occur, 1.);
 
 		// E-step (adding candidate to transactions that support it)
 		final Map<Multiset.Entry<Sequence>, Long> coveringWithCounts = transactions.getTransactionList()

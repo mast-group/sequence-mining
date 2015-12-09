@@ -44,7 +44,7 @@ public class SequenceMining extends SequenceMiningCore {
 				"/afs/inf.ed.ac.uk/user/j/jfowkes/Code/Sequences/Datasets/Paper/jmlr.dat");
 
 		@Parameter(names = { "-s", "--maxSteps" }, description = "Max structure steps")
-		int maxStructureSteps = 1_000;
+		int maxStructureSteps = 100_000;
 
 		@Parameter(names = { "-i", "--iterations" }, description = "Max iterations")
 		int maxEMIterations = 1_000;
