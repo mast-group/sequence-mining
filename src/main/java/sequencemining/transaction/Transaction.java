@@ -3,6 +3,7 @@ package sequencemining.transaction;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -76,8 +77,11 @@ public class Transaction extends AbstractSequence implements Serializable {
 					totalCost += sumLogRange(lenCovering + 1, lenCovering + seq.size()) - sumLogRange(1, seq.size());
 					lenCovering += seq.size();
 				}
-			} else
+			} else if (seq.size() == 1 && sum(cachedSequences.row(seq).values()) == 0.) {
+				continue; // ignore singletons used to fill incomplete coverings
+			} else {
 				totalCost += -Math.log(cachedSequences.get(seq, 0));
+			}
 		}
 		return totalCost;
 	}
@@ -107,11 +111,21 @@ public class Transaction extends AbstractSequence implements Serializable {
 								- sumLogRange(1, seq.size());
 						lenCovering += seq.size();
 					}
-				} else
+				} else if (seq.size() == 1 && sum(cachedSequences.row(seq).values()) == 0.) {
+					continue; // ignore seqs used to fill incomplete coverings
+				} else {
 					totalCost += -Math.log(sequences.get(seq, 0));
+				}
 			}
 		}
 		return totalCost;
+	}
+
+	private double sum(final Collection<Double> elems) {
+		double sum = 0;
+		for (final double elem : elems)
+			sum += elem;
+		return sum;
 	}
 
 	private double sumLogRange(final int a, final int b) {
