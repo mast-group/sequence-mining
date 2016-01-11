@@ -177,9 +177,8 @@ public class EMStep {
 	/** Get the support of requested sequence */
 	static int getSupportOfSequence(final TransactionDatabase transactions, final Sequence seq) {
 		return transactions.getTransactionList().parallelStream().mapToInt(t -> {
-			for (final Transaction trans : transactions.getTransactionList())
-				if (trans.contains(seq))
-					return 1;
+			if (t.contains(seq))
+				return 1;
 			return 0;
 		}).sum();
 	}
