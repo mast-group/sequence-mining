@@ -58,8 +58,7 @@ public class InferenceAlgorithms {
 					Double prob = cachedSequences.get(seq, occur + 1);
 					if (prob == null)
 						prob = 0.; // Empty multiplicities have zero probability
-					double cost = -Math.log(prob) + sumLogRange(lenCovering + 1, lenCovering + seq.size())
-							- sumLogRange(1, seq.size());
+					double cost = -Math.log(prob) + sumLogRange(lenCovering + 1, lenCovering + seq.size());
 					if (occur != 0) // If seq already in covering need prev cost
 						cost += Math.log(cachedSequences.get(seq, occur));
 					final double costPerItem = cost / seq.size();

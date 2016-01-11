@@ -74,7 +74,7 @@ public class Transaction extends AbstractSequence implements Serializable {
 				final int occur = cachedCovering.count(seq);
 				totalCost += -Math.log(cachedSequences.get(seq, occur));
 				for (int m = 1; m <= occur; m++) {
-					totalCost += sumLogRange(lenCovering + 1, lenCovering + seq.size()) - sumLogRange(1, seq.size());
+					totalCost += sumLogRange(lenCovering + 1, lenCovering + seq.size());
 					lenCovering += seq.size();
 				}
 			} else if (seq.size() == 1 && sum(cachedSequences.row(seq).values()) == 0.) {
@@ -107,8 +107,7 @@ public class Transaction extends AbstractSequence implements Serializable {
 					final int occur = covering.count(seq);
 					totalCost += -Math.log(sequences.get(seq, occur));
 					for (int m = 1; m <= occur; m++) {
-						totalCost += sumLogRange(lenCovering + 1, lenCovering + seq.size())
-								- sumLogRange(1, seq.size());
+						totalCost += sumLogRange(lenCovering + 1, lenCovering + seq.size());
 						lenCovering += seq.size();
 					}
 				} else if (seq.size() == 1 && sum(cachedSequences.row(seq).values()) == 0.) {
