@@ -1,11 +1,5 @@
 package sequencemining.eval;
 
-import sequencemining.main.SequenceMining;
-import sequencemining.main.InferenceAlgorithms.InferGreedy;
-import sequencemining.sequence.Sequence;
-import sequencemining.transaction.Transaction;
-import sequencemining.transaction.TransactionList;
-
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
@@ -19,6 +13,12 @@ import java.util.Random;
 import java.util.Set;
 
 import org.apache.commons.io.LineIterator;
+
+import sequencemining.main.InferenceAlgorithms.InferGreedy;
+import sequencemining.main.SequenceMining;
+import sequencemining.sequence.Sequence;
+import sequencemining.transaction.Transaction;
+import sequencemining.transaction.TransactionList;
 
 public class ParityClassificationTask {
 
@@ -37,26 +37,36 @@ public class ParityClassificationTask {
 		generateParityProblem(N, M, L, noInstances, dbFile);
 		final TransactionList dbTrans = SequenceMining.readTransactions(dbFile);
 
-		// Mine freq seqs
-		final double minSup = 0.6;
-		final Map<Sequence, Integer> seqsFSM = FrequentSequenceMining
-				.mineFrequentSequencesPrefixSpan(dbFile.getPath(), null, minSup);
-		System.out.println(seqsFSM);
+		// Mine SQS seqs
+		final File tmpOut = File.createTempFile("classification_temp", ".txt");
+		final Map<Sequence, Double> seqsSQS = StatisticalSequenceMining.mineSQSSequences(dbFile, tmpOut, 1);
+		System.out.println(seqsSQS);
+		// Generate SQS seq features
+		// seqsSQS = removeSingletons(seqsSQS);
+		final File featuresSQS = new File(baseFolder + "FeaturesSQS.txt");
+		generateFeatures(dbTrans, seqsSQS.keySet(), featuresSQS, N, M);
 
-		// Generate freq seq features
-		// seqsFSM = removeSingletons(seqsFSM);
-		final File featuresFSM = new File(baseFolder + "FeaturesFSM.txt");
-		generateFeatures(dbTrans, seqsFSM.keySet(), featuresFSM, N, M);
+		// // Mine GOKRIMP seqs
+		// final File tmpOut2 = File.createTempFile("classification_temp",
+		// ".txt");
+		// final Map<Sequence, Double> seqsGOKRIMP =
+		// StatisticalSequenceMining.mineGoKrimpSequences(dbFile, tmpOut2);
+		// tmpOut2.delete();
+		// System.out.println(seqsGOKRIMP);
+		// // Generate GOKRIMP seq features
+		// // seqsGOKRIMP = removeSingletons(seqsGOKRIMP);
+		// final File featuresGOKRIMP = new File(baseFolder +
+		// "FeaturesGOKRIMP.txt");
+		// generateFeatures(dbTrans, seqsGOKRIMP.keySet(), featuresGOKRIMP, N,
+		// M);
 
-		// Mine int seqs
+		// Mine ISM seqs
 		final int maxStructureSteps = 100_000;
 		final int maxEMIterations = 1_000;
-		final Map<Sequence, Double> seqsISM = SequenceMining.mineSequences(
-				dbFile, new InferGreedy(), maxStructureSteps, maxEMIterations,
-				null, false);
+		final Map<Sequence, Double> seqsISM = SequenceMining.mineSequences(dbFile, new InferGreedy(), maxStructureSteps,
+				maxEMIterations, null, false);
 		System.out.println(seqsISM);
-
-		// Generate int seq features
+		// Generate ISM seq features
 		// seqsISM = removeSingletons(seqsISM);
 		final File featuresISM = new File(baseFolder + "FeaturesISM.txt");
 		generateFeatures(dbTrans, seqsISM.keySet(), featuresISM, N, M);
@@ -66,15 +76,15 @@ public class ParityClassificationTask {
 		generateSimpleFeatures(dbTrans, featuresSimple, N, M);
 
 		// Run MALLET Naive Bayes classifier
-		MarkovClassificationTask.classify(baseFolder, featuresFSM);
+		MarkovClassificationTask.classify(baseFolder, featuresSQS);
+		// classify(baseFolder, featuresGOKRIMP);
 		MarkovClassificationTask.classify(baseFolder, featuresISM);
 		MarkovClassificationTask.classify(baseFolder, featuresSimple);
 
 	}
 
-	private static void generateParityProblem(final int N, final int M,
-			final int L, final int noInstances, final File outFile)
-			throws IOException {
+	private static void generateParityProblem(final int N, final int M, final int L, final int noInstances,
+			final File outFile) throws IOException {
 
 		// Set random number seed
 		final Random random = new Random(1);
@@ -112,9 +122,8 @@ public class ParityClassificationTask {
 
 	}
 
-	private static void generateFeatures(final TransactionList dbTrans,
-			final Set<Sequence> seqs, final File outFile, final int N,
-			final int M) throws IOException {
+	private static void generateFeatures(final TransactionList dbTrans, final Set<Sequence> seqs, final File outFile,
+			final int N, final int M) throws IOException {
 
 		// Set output file
 		final PrintWriter out = new PrintWriter(outFile, "UTF-8");
@@ -139,8 +148,8 @@ public class ParityClassificationTask {
 			printFileToScreen(outFile);
 	}
 
-	private static void generateSimpleFeatures(final TransactionList dbTrans,
-			final File outFile, final int N, final int M) throws IOException {
+	private static void generateSimpleFeatures(final TransactionList dbTrans, final File outFile, final int N,
+			final int M) throws IOException {
 
 		// Set output file
 		final PrintWriter out = new PrintWriter(outFile, "UTF-8");
@@ -165,8 +174,7 @@ public class ParityClassificationTask {
 			printFileToScreen(outFile);
 	}
 
-	private static int getLabel(final Transaction trans, final int N,
-			final int M) {
+	private static int getLabel(final Transaction trans, final int N, final int M) {
 		final List<Integer> items = trans.getItems();
 		int score = 0;
 		for (int i = 0; i < N; i++) {
@@ -179,8 +187,7 @@ public class ParityClassificationTask {
 		return (score > N / 2.) ? 1 : 0;
 	}
 
-	public static void printFileToScreen(final File file)
-			throws FileNotFoundException {
+	public static void printFileToScreen(final File file) throws FileNotFoundException {
 		final FileReader reader = new FileReader(file);
 		final LineIterator it = new LineIterator(reader);
 		while (it.hasNext()) {

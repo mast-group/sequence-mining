@@ -1,11 +1,5 @@
 package sequencemining.eval;
 
-import sequencemining.main.SequenceMining;
-import sequencemining.main.InferenceAlgorithms.InferGreedy;
-import sequencemining.sequence.Sequence;
-import sequencemining.transaction.Transaction;
-import sequencemining.transaction.TransactionList;
-
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
@@ -33,6 +27,12 @@ import org.apache.commons.math3.random.RandomGenerator;
 
 import com.google.common.collect.Lists;
 
+import sequencemining.main.InferenceAlgorithms.InferGreedy;
+import sequencemining.main.SequenceMining;
+import sequencemining.sequence.Sequence;
+import sequencemining.transaction.Transaction;
+import sequencemining.transaction.TransactionList;
+
 public class MarkovClassificationTask {
 
 	private static final boolean VERBOSE = false;
@@ -42,17 +42,14 @@ public class MarkovClassificationTask {
 		// final int noLabels = 2;
 		final int noStates = 4;
 		final int noSteps = 10;
-		final int noInstances = 1000;
+		final int noInstances = 10_000;
 		final String baseFolder = "/afs/inf.ed.ac.uk/user/j/jfowkes/Code/Sequences/Classification/Markov/";
 		final File dbFile = new File(baseFolder + "MARKOV.txt");
 
 		// Set up correlated matrices
-		final double[][] F = new double[][] { { 1, 100, 1, 1 },
-				{ 1, 1, 100, 1 }, { 1, 1, 1, 100 }, { 100, 1, 1, 1 } };
-		final double[][] B = new double[][] { { 1, 1, 1, 100 },
-				{ 100, 1, 1, 1 }, { 1, 100, 1, 1 }, { 1, 1, 100, 1 } };
-		final List<RealMatrix> matrices = Lists.newArrayList(
-				new Array2DRowRealMatrix(F), new Array2DRowRealMatrix(B));
+		final double[][] F = new double[][] { { 1, 100, 1, 1 }, { 1, 1, 100, 1 }, { 1, 1, 1, 100 }, { 100, 1, 1, 1 } };
+		final double[][] B = new double[][] { { 1, 1, 1, 100 }, { 100, 1, 1, 1 }, { 1, 100, 1, 1 }, { 1, 1, 100, 1 } };
+		final List<RealMatrix> matrices = Lists.newArrayList(new Array2DRowRealMatrix(F), new Array2DRowRealMatrix(B));
 
 		// Set up starting vectors
 		final List<RealVector> starts = new ArrayList<>();
@@ -60,30 +57,40 @@ public class MarkovClassificationTask {
 			starts.add(new ArrayRealVector(noStates, 1. / noStates));
 
 		// Generate Sequence database
-		final int[] labels = generateMarkovProblem(noSteps, noInstances,
-				matrices, starts, dbFile);
+		final int[] labels = generateMarkovProblem(noSteps, noInstances, matrices, starts, dbFile);
 		final TransactionList dbTrans = SequenceMining.readTransactions(dbFile);
 
-		// Mine freq seqs
-		final double minSup = 0.8;
-		final Map<Sequence, Integer> seqsFSM = FrequentSequenceMining
-				.mineFrequentSequencesPrefixSpan(dbFile.getPath(), null, minSup);
-		System.out.println(seqsFSM);
+		// Mine SQS seqs
+		final File tmpOut = File.createTempFile("classification_temp", ".txt");
+		final Map<Sequence, Double> seqsSQS = StatisticalSequenceMining.mineSQSSequences(dbFile, tmpOut, 1);
+		tmpOut.delete();
+		System.out.println(seqsSQS);
+		// Generate SQS seq features
+		// seqsSQS = removeSingletons(seqsSQS);
+		final File featuresSQS = new File(baseFolder + "FeaturesSQS.txt");
+		generateFeatures(dbTrans, seqsSQS.keySet(), featuresSQS, labels);
 
-		// Generate freq seq features
-		// seqsFSM = removeSingletons(seqsFSM);
-		final File featuresFSM = new File(baseFolder + "FeaturesFSM.txt");
-		generateFeatures(dbTrans, seqsFSM.keySet(), featuresFSM, labels);
+		// // Mine GOKRIMP seqs
+		// final File tmpOut2 = File.createTempFile("classification_temp",
+		// ".txt");
+		// Map<Sequence, Double> seqsGOKRIMP =
+		// StatisticalSequenceMining.mineGoKrimpSequences(dbFile, tmpOut2);
+		// tmpOut2.delete();
+		// System.out.println(seqsGOKRIMP);
+		// // Generate GOKRIMP seq features
+		// seqsGOKRIMP = removeSingletons(seqsGOKRIMP);
+		// final File featuresGOKRIMP = new File(baseFolder +
+		// "FeaturesGOKRIMP.txt");
+		// generateFeatures(dbTrans, seqsGOKRIMP.keySet(), featuresGOKRIMP,
+		// labels);
 
-		// Mine int seqs
+		// Mine ISM seqs
 		final int maxStructureSteps = 100_000;
 		final int maxEMIterations = 1_000;
-		final Map<Sequence, Double> seqsISM = SequenceMining.mineSequences(
-				dbFile, new InferGreedy(), maxStructureSteps, maxEMIterations,
-				null, false);
+		final Map<Sequence, Double> seqsISM = SequenceMining.mineSequences(dbFile, new InferGreedy(), maxStructureSteps,
+				maxEMIterations, null, false);
 		System.out.println(seqsISM);
-
-		// Generate int seq features
+		// Generate ISM seq features
 		// seqsISM = removeSingletons(seqsISM);
 		final File featuresISM = new File(baseFolder + "FeaturesISM.txt");
 		generateFeatures(dbTrans, seqsISM.keySet(), featuresISM, labels);
@@ -96,15 +103,14 @@ public class MarkovClassificationTask {
 		generateFeatures(dbTrans, singletons, featuresSimple, labels);
 
 		// Run MALLET Naive Bayes classifier
-		classify(baseFolder, featuresFSM);
+		classify(baseFolder, featuresSQS);
+		// classify(baseFolder, featuresGOKRIMP);
 		classify(baseFolder, featuresISM);
 		classify(baseFolder, featuresSimple);
 	}
 
-	private static int[] generateMarkovProblem(final int noSteps,
-			final int noInstances, final List<RealMatrix> matrices,
-			final List<RealVector> starts, final File outFile)
-			throws IOException {
+	private static int[] generateMarkovProblem(final int noSteps, final int noInstances,
+			final List<RealMatrix> matrices, final List<RealVector> starts, final File outFile) throws IOException {
 
 		// Set random number seed
 		final Random random = new Random(1);
@@ -125,8 +131,7 @@ public class MarkovClassificationTask {
 
 			// Set up chain
 			// SinkhornKnopp(matrices.get(i));
-			final MarkovChain chain = new MarkovChain(new MersenneTwister(i),
-					matrices.get(i), starts.get(i));
+			final MarkovChain chain = new MarkovChain(new MersenneTwister(i), matrices.get(i), starts.get(i));
 
 			// Step
 			out.print(chain.getState() + " -1 ");
@@ -144,9 +149,8 @@ public class MarkovClassificationTask {
 		return labels;
 	}
 
-	private static void generateFeatures(final TransactionList dbTrans,
-			final Set<Sequence> seqs, final File outFile, final int[] labels)
-			throws IOException {
+	private static void generateFeatures(final TransactionList dbTrans, final Set<Sequence> seqs, final File outFile,
+			final int[] labels) throws IOException {
 
 		// Set output file
 		final PrintWriter out = new PrintWriter(outFile, "UTF-8");
@@ -173,8 +177,7 @@ public class MarkovClassificationTask {
 			printFileToScreen(outFile);
 	}
 
-	public static RealMatrix generateRandomPositiveSquareMatrix(final int n,
-			final RandomGenerator rand) {
+	public static RealMatrix generateRandomPositiveSquareMatrix(final int n, final RandomGenerator rand) {
 		final double[][] d = new double[n][n];
 		for (int i = 0; i < n; i++) {
 			for (int j = 0; j < n; j++) {
@@ -207,16 +210,13 @@ public class MarkovClassificationTask {
 			c = e.ebeDivide(A.preMultiply(r));
 			r = e.ebeDivide(A.operate(c));
 		}
-		final RealMatrix Dr = MatrixUtils.createRealDiagonalMatrix(r
-				.getDataRef());
-		final RealMatrix Dc = MatrixUtils.createRealDiagonalMatrix(c
-				.getDataRef());
+		final RealMatrix Dr = MatrixUtils.createRealDiagonalMatrix(r.getDataRef());
+		final RealMatrix Dc = MatrixUtils.createRealDiagonalMatrix(c.getDataRef());
 
 		return Dr.multiply(A).multiply(Dc);
 	}
 
-	public static void printFileToScreen(final File file)
-			throws FileNotFoundException {
+	public static void printFileToScreen(final File file) throws FileNotFoundException {
 		final FileReader reader = new FileReader(file);
 		final LineIterator it = new LineIterator(reader);
 		while (it.hasNext()) {
@@ -237,10 +237,11 @@ public class MarkovClassificationTask {
 	/** Classify using MALLET Naive Bayes */
 	static void classify(final String baseFolder, final File inFile) {
 
-		final String alg = inFile.getName().replace("Features", "")
-				.replace(".txt", "");
+		final String alg = inFile.getName().replace("Features", "").replace(".txt", "");
 		final File tmpFile = new File(baseFolder + alg + ".mallet");
 		final File outFile = new File(baseFolder + alg + "Classification.txt");
+
+		System.out.println("\n===== Classification using " + alg + " features");
 
 		// Convert to binary MALLET format
 		final String cmd[] = new String[4];
@@ -265,6 +266,13 @@ public class MarkovClassificationTask {
 		cmd3[0] = "rm";
 		cmd3[1] = tmpFile.toString();
 		runScript(cmd3, null);
+
+		// Print output to screen
+		final String cmd4[] = new String[3];
+		cmd4[0] = "tail";
+		cmd4[1] = "-n 2";
+		cmd4[2] = "" + outFile;
+		runScript(cmd4, null);
 
 	}
 
