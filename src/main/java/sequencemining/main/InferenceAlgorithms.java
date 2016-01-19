@@ -2,6 +2,7 @@ package sequencemining.main;
 
 import java.io.Serializable;
 import java.util.BitSet;
+import java.util.Map;
 
 import com.google.common.collect.HashMultiset;
 import com.google.common.collect.Multiset;
@@ -58,9 +59,15 @@ public class InferenceAlgorithms {
 					Double prob = cachedSequences.get(seq, occur + 1);
 					if (prob == null)
 						prob = 0.; // Empty multiplicities have zero probability
+					else if (prob == 0. && isInnerProb(occur + 1, cachedSequences.row(seq)))
+						prob = Double.MIN_VALUE; // Smooth inner zero probs
 					double cost = -Math.log(prob) + sumLogRange(lenCovering + 1, lenCovering + seq.size());
-					if (occur != 0) // If seq already in covering need prev cost
-						cost += Math.log(cachedSequences.get(seq, occur));
+					if (occur != 0) { // If seq already in cover need prev cost
+						prob = cachedSequences.get(seq, occur);
+						if (prob == 0. && isInnerProb(occur, cachedSequences.row(seq)))
+							prob = Double.MIN_VALUE; // Smooth inner zero probs
+						cost += Math.log(prob);
+					}
 					final double costPerItem = cost / seq.size();
 
 					if (costPerItem < minCostPerItem) {
@@ -91,6 +98,14 @@ public class InferenceAlgorithms {
 
 			}
 			return covering;
+		}
+
+		private boolean isInnerProb(final int probIndex, final Map<Integer, Double> probVec) {
+			for (int i = probIndex + 1; i < probVec.size(); i++) {
+				if (probVec.get(i) != 0.)
+					return true;
+			}
+			return false;
 		}
 
 		private double sumLogRange(final int a, final int b) {
