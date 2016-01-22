@@ -46,19 +46,15 @@ public class ParityClassificationTask {
 		final File featuresSQS = new File(baseFolder + "FeaturesSQS.txt");
 		generateFeatures(dbTrans, seqsSQS.keySet(), featuresSQS, N, M);
 
-		// // Mine GOKRIMP seqs
-		// final File tmpOut2 = File.createTempFile("classification_temp",
-		// ".txt");
-		// final Map<Sequence, Double> seqsGOKRIMP =
-		// StatisticalSequenceMining.mineGoKrimpSequences(dbFile, tmpOut2);
-		// tmpOut2.delete();
-		// System.out.println(seqsGOKRIMP);
-		// // Generate GOKRIMP seq features
-		// // seqsGOKRIMP = removeSingletons(seqsGOKRIMP);
-		// final File featuresGOKRIMP = new File(baseFolder +
-		// "FeaturesGOKRIMP.txt");
-		// generateFeatures(dbTrans, seqsGOKRIMP.keySet(), featuresGOKRIMP, N,
-		// M);
+		// Mine GOKRIMP seqs
+		final File tmpOut2 = File.createTempFile("classification_temp", ".txt");
+		final Map<Sequence, Double> seqsGOKRIMP = StatisticalSequenceMining.mineGoKrimpSequences(dbFile, tmpOut2);
+		tmpOut2.delete();
+		System.out.println(seqsGOKRIMP);
+		// Generate GOKRIMP seq features
+		// seqsGOKRIMP = removeSingletons(seqsGOKRIMP);
+		final File featuresGOKRIMP = new File(baseFolder + "FeaturesGOKRIMP.txt");
+		generateFeatures(dbTrans, seqsGOKRIMP.keySet(), featuresGOKRIMP, N, M);
 
 		// Mine ISM seqs
 		final int maxStructureSteps = 100_000;
@@ -77,7 +73,7 @@ public class ParityClassificationTask {
 
 		// Run MALLET Naive Bayes classifier
 		MarkovClassificationTask.classify(baseFolder, featuresSQS);
-		// classify(baseFolder, featuresGOKRIMP);
+		MarkovClassificationTask.classify(baseFolder, featuresGOKRIMP);
 		MarkovClassificationTask.classify(baseFolder, featuresISM);
 		MarkovClassificationTask.classify(baseFolder, featuresSimple);
 
@@ -96,12 +92,12 @@ public class ParityClassificationTask {
 		int count = 0;
 		while (count < noInstances) {
 			for (int i = 0; i < N; i++) {
-				if (random.nextDouble() < 0.6) {
-					for (int j = 0; j < M; j++)
-						out.print(2 * (i * M + j) + " -1 ");
+				if (random.nextDouble() < 0.5) {
+					for (int j = 0; j < M; j++) // shift by 2 for GoKRIMP
+						out.print(2 + 2 * (i * M + j) + " -1 ");
 				} else {
-					for (int j = 0; j < M; j++)
-						out.print(2 * (i * M + j) + 1 + " -1 ");
+					for (int j = 0; j < M; j++) // shift by 2 for GoKRIMP
+						out.print(2 + 2 * (i * M + j) + 1 + " -1 ");
 				}
 			}
 			for (int k = M * N; k < M * N + L; k++) {
@@ -110,7 +106,7 @@ public class ParityClassificationTask {
 					item = 2 * k;
 				else
 					item = 2 * k + 1;
-				out.print(item + " -1 ");
+				out.print(2 + item + " -1 "); // shift by 2 for GoKRIMP
 			}
 			out.print("-2\n");
 			count++;

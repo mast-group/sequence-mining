@@ -70,19 +70,15 @@ public class MarkovClassificationTask {
 		final File featuresSQS = new File(baseFolder + "FeaturesSQS.txt");
 		generateFeatures(dbTrans, seqsSQS.keySet(), featuresSQS, labels);
 
-		// // Mine GOKRIMP seqs
-		// final File tmpOut2 = File.createTempFile("classification_temp",
-		// ".txt");
-		// Map<Sequence, Double> seqsGOKRIMP =
-		// StatisticalSequenceMining.mineGoKrimpSequences(dbFile, tmpOut2);
-		// tmpOut2.delete();
-		// System.out.println(seqsGOKRIMP);
-		// // Generate GOKRIMP seq features
-		// seqsGOKRIMP = removeSingletons(seqsGOKRIMP);
-		// final File featuresGOKRIMP = new File(baseFolder +
-		// "FeaturesGOKRIMP.txt");
-		// generateFeatures(dbTrans, seqsGOKRIMP.keySet(), featuresGOKRIMP,
-		// labels);
+		// Mine GOKRIMP seqs
+		final File tmpOut2 = File.createTempFile("classification_temp", ".txt");
+		Map<Sequence, Double> seqsGOKRIMP = StatisticalSequenceMining.mineGoKrimpSequences(dbFile, tmpOut2);
+		tmpOut2.delete();
+		System.out.println(seqsGOKRIMP);
+		// Generate GOKRIMP seq features
+		seqsGOKRIMP = removeSingletons(seqsGOKRIMP);
+		final File featuresGOKRIMP = new File(baseFolder + "FeaturesGOKRIMP.txt");
+		generateFeatures(dbTrans, seqsGOKRIMP.keySet(), featuresGOKRIMP, labels);
 
 		// Mine ISM seqs
 		final int maxStructureSteps = 100_000;
@@ -104,7 +100,7 @@ public class MarkovClassificationTask {
 
 		// Run MALLET Naive Bayes classifier
 		classify(baseFolder, featuresSQS);
-		// classify(baseFolder, featuresGOKRIMP);
+		classify(baseFolder, featuresGOKRIMP);
 		classify(baseFolder, featuresISM);
 		classify(baseFolder, featuresSimple);
 	}
@@ -125,7 +121,7 @@ public class MarkovClassificationTask {
 
 			// Choose label
 			int i = 0;
-			if (random.nextDouble() < 0.6)
+			if (random.nextDouble() < 0.5)
 				i = 1;
 			labels[count] = i;
 
@@ -134,9 +130,9 @@ public class MarkovClassificationTask {
 			final MarkovChain chain = new MarkovChain(new MersenneTwister(i), matrices.get(i), starts.get(i));
 
 			// Step
-			out.print(chain.getState() + " -1 ");
+			out.print(1 + chain.getState() + " -1 "); // shift by 1 for GoKRIMP
 			for (int k = 1; k < noSteps; k++) {
-				out.print(chain.step() + " -1 ");
+				out.print(1 + chain.step() + " -1 "); // shift by 1 for GoKRIMP
 			}
 			out.print("-2\n");
 			count++;
