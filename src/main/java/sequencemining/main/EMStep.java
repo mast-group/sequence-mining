@@ -66,11 +66,10 @@ public class EMStep {
 	}
 
 	/** Get average cost of last EM-step */
-	static void calculateAndSetAverageCost(final TransactionDatabase transactions) {
+	static double calculateAverageCost(final TransactionDatabase transactions) {
 		final double noTransactions = transactions.size();
-		final double averageCost = transactions.getTransactionList().parallelStream()
-				.mapToDouble(Transaction::getCachedCost).sum() / noTransactions;
-		transactions.setAverageCost(averageCost);
+		return transactions.getTransactionList().parallelStream().mapToDouble(Transaction::getCachedCost).sum()
+				/ noTransactions;
 	}
 
 	/** EM-step for structural EM */

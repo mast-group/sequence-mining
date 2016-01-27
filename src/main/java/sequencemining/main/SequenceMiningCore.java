@@ -146,6 +146,7 @@ public abstract class SequenceMiningCore {
 		Table<Sequence, Integer, Double> prevSequences = sequences;
 
 		double norm = 1;
+		double normDiff = Double.MAX_VALUE;
 		while (norm > OPTIMIZE_TOL) {
 
 			// Set up storage
@@ -158,28 +159,45 @@ public abstract class SequenceMiningCore {
 			// else
 			newSequences = EMStep.hardEMStep(transactions.getTransactionList(), inferenceAlgorithm);
 
-			// If set has stabilised calculate norm(p_prev - p_new)
+			// If set has stabilised calculate norm(P_prev - P_new)
 			if (prevSequences.rowKeySet().equals(newSequences.rowKeySet())) {
-				norm = 0;
+				double newNorm = 0;
 				for (final Sequence seq : prevSequences.rowKeySet()) {
 					for (final int occur : prevSequences.row(seq).keySet()) {
 						Double newProb = newSequences.get(seq, occur);
 						if (newProb == null)
 							newProb = 0.; // Empty multiplicities have zero prob
-						norm += Math.pow(prevSequences.get(seq, occur) - newProb, 2);
+						newNorm += Math.pow(prevSequences.get(seq, occur) - newProb, 2);
 					}
 				}
-				norm = Math.sqrt(norm);
+				newNorm = Math.sqrt(newNorm);
+				final double newNormDiff = Math.abs(newNorm - norm);
+
+				// Avoid infinite oscillating loops
+				if (Math.abs(newNormDiff - normDiff) == 0.) {
+					logger.warning(" EM oscillating, taking best cost solution...\n");
+					final double newCost = EMStep.calculateAverageCost(transactions);
+					prevSequences = EMStep.hardEMStep(transactions.getTransactionList(), inferenceAlgorithm);
+					final double prevCost = EMStep.calculateAverageCost(transactions);
+					if (prevCost > newCost) // Back to newSequences in the cache
+						prevSequences = EMStep.hardEMStep(transactions.getTransactionList(), inferenceAlgorithm);
+					break;
+				}
+				norm = newNorm;
+				normDiff = newNormDiff;
 			}
 
+			// N.B. this output really slows down the algorithm...
+			// logger.finest(" New Sequences:" + newSequences + "\n");
+			// logger.finest(" Norm: " + norm + "\n");
 			prevSequences = newSequences;
 		}
 
 		// Calculate average cost of last covering
 		// if (transactions instanceof TransactionRDD)
-		// SparkEMStep.calculateAndSetAverageCost(transactions);
+		// transactions.setAverageCost(SparkEMStep.calculateAverageCost(transactions));
 		// else
-		EMStep.calculateAndSetAverageCost(transactions);
+		transactions.setAverageCost(EMStep.calculateAverageCost(transactions));
 
 		sequences.clear();
 		sequences.putAll(prevSequences);
