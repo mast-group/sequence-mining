@@ -56,18 +56,16 @@ public class InferenceAlgorithms {
 
 					// TODO triple check that this is right!!!
 					// Calculate f(CuS) - f(C)
-					Double prob = cachedSequences.get(seq, occur + 1);
-					if (prob == null)
-						prob = 0.; // Empty multiplicities have zero probability
-					else if (prob == 0. && isInnerProb(occur + 1, cachedSequences.row(seq)))
-						prob = Double.MIN_VALUE; // Smooth inner zero probs
-					double cost = -Math.log(prob) + sumLogRange(lenCovering + 1, lenCovering + seq.size());
-					if (occur != 0) { // If seq already in cover need prev cost
-						prob = cachedSequences.get(seq, occur);
-						if (prob == 0. && isInnerProb(occur, cachedSequences.row(seq)))
-							prob = Double.MIN_VALUE; // Smooth inner zero probs
-						cost += Math.log(prob);
-					}
+					Double prob1 = cachedSequences.get(seq, occur + 1);
+					if (prob1 == null)
+						prob1 = 0.; // Empty multiplicities have zero prob
+					else if (prob1 == 0. && isInnerProb(occur + 1, cachedSequences.row(seq)))
+						prob1 = Double.MIN_VALUE; // Smooth zero inner probs
+					double prob = cachedSequences.get(seq, occur);
+					if (prob == 0. && isInnerProb(occur, cachedSequences.row(seq)))
+						prob = Double.MIN_VALUE; // Smooth zero inner probs
+					final double cost = -Math.log(prob1) + Math.log(prob)
+							+ sumLogRange(lenCovering + 1, lenCovering + seq.size());
 					final double costPerItem = cost / seq.size();
 
 					if (costPerItem < minCostPerItem) {
