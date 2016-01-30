@@ -56,9 +56,4 @@ public class Sequence extends AbstractSequence implements Serializable {
 		this.items.addAll(seq2.items);
 	}
 
-	@Override
-	public String toString() {
-		return items.toString();
-	}
-
 }
