@@ -146,6 +146,7 @@ public abstract class SequenceMiningCore {
 		Table<Sequence, Integer, Double> prevSequences = sequences;
 
 		double norm = 1;
+		double prevNormDiff = Double.MAX_VALUE;
 		double normDiff = Double.MAX_VALUE;
 		while (norm > OPTIMIZE_TOL) {
 
@@ -153,10 +154,6 @@ public abstract class SequenceMiningCore {
 			final Table<Sequence, Integer, Double> newSequences;
 
 			// Parallel E-step and M-step combined
-			// if (transactions instanceof TransactionRDD)
-			// newItemsets = SparkEMStep.hardEMStep(transactions,
-			// inferenceAlgorithm);
-			// else
 			newSequences = EMStep.hardEMStep(transactions.getTransactionList(), inferenceAlgorithm);
 
 			// If set has stabilised calculate norm(P_prev - P_new)
@@ -175,15 +172,30 @@ public abstract class SequenceMiningCore {
 
 				// Avoid infinite oscillating loops
 				if (Math.abs(newNormDiff - normDiff) == 0.) {
-					logger.warning(" EM oscillating, taking best cost solution...\n");
+					logger.warning(" EM oscillating between two states, taking best cost solution...\n");
 					final double newCost = EMStep.calculateAverageCost(transactions);
 					prevSequences = EMStep.hardEMStep(transactions.getTransactionList(), inferenceAlgorithm);
 					final double prevCost = EMStep.calculateAverageCost(transactions);
-					if (prevCost > newCost) // Back to newSequences in the cache
+					if (newCost < prevCost) // Back to newSequences in the cache
 						prevSequences = EMStep.hardEMStep(transactions.getTransactionList(), inferenceAlgorithm);
+					break;
+				} else if (Math.abs(Math.abs(newNormDiff - normDiff - prevNormDiff)) == 0.) {
+					logger.warning(" EM oscillating between three states, taking best cost solution...\n");
+					final double newCost = EMStep.calculateAverageCost(transactions);
+					EMStep.hardEMStep(transactions.getTransactionList(), inferenceAlgorithm);
+					final double prevCost1 = EMStep.calculateAverageCost(transactions);
+					EMStep.hardEMStep(transactions.getTransactionList(), inferenceAlgorithm);
+					final double prevCost2 = EMStep.calculateAverageCost(transactions);
+					if (newCost < prevCost1 && newCost < prevCost2) // newSequences
+						prevSequences = EMStep.hardEMStep(transactions.getTransactionList(), inferenceAlgorithm);
+					else if (prevCost1 < prevCost2 && prevCost1 < newCost) { // prevSequences
+						EMStep.hardEMStep(transactions.getTransactionList(), inferenceAlgorithm);
+						prevSequences = EMStep.hardEMStep(transactions.getTransactionList(), inferenceAlgorithm);
+					}
 					break;
 				}
 				norm = newNorm;
+				prevNormDiff = normDiff;
 				normDiff = newNormDiff;
 			}
 
@@ -194,9 +206,6 @@ public abstract class SequenceMiningCore {
 		}
 
 		// Calculate average cost of last covering
-		// if (transactions instanceof TransactionRDD)
-		// transactions.setAverageCost(SparkEMStep.calculateAverageCost(transactions));
-		// else
 		transactions.setAverageCost(EMStep.calculateAverageCost(transactions));
 
 		sequences.clear();
