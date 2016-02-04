@@ -88,7 +88,7 @@ public class SequenceMiningTest {
 		final int occur = 3;
 		double expectedCost2 = -Math.log(p4.get(occur));
 		for (int m = 1; m <= 3; m++) {
-			expectedCost2 += sumLogRange(lenCovering + 1, lenCovering + s4.size()) - sumLogRange(1, s4.size());
+			expectedCost2 += sumLogRange(lenCovering + 1, lenCovering + s4.size());
 			lenCovering += s4.size();
 		}
 
