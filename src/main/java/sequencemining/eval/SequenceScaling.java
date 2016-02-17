@@ -34,10 +34,10 @@ public class SequenceScaling {
 	/** Set of mined itemsets to use for background */
 	private static final String name = "SIGN-based";
 	private static final File sequenceLog = new File(
-			"/afs/inf.ed.ac.uk/user/j/jfowkes/Code/Sequences/Logs/ISM-SIGN-27.05.2015-15:12:45.log");
+			"/afs/inf.ed.ac.uk/user/j/jfowkes/Code/Sequences/Logs/SIGN.log");
 
 	/** Spark Settings */
-	private static final long MAX_RUNTIME = 6 * 60; // 6hrs
+	private static final long MAX_RUNTIME = 24 * 60; // 24hrs
 	private static final int maxStructureSteps = 100_000;
 	private static final int maxEMIterations = 100;
 

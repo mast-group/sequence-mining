@@ -9,6 +9,10 @@ import java.util.SortedMap;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.LineIterator;
 
+import com.google.common.base.Functions;
+import com.google.common.collect.ImmutableSortedMap;
+import com.google.common.collect.Ordering;
+
 import ca.pfv.spmf.algorithms.sequentialpatterns.BIDE_and_prefixspan.AlgoBIDEPlus;
 import ca.pfv.spmf.algorithms.sequentialpatterns.BIDE_and_prefixspan.AlgoPrefixSpan;
 import ca.pfv.spmf.algorithms.sequentialpatterns.BIDE_and_prefixspan.SequentialPattern;
@@ -24,94 +28,78 @@ import ca.pfv.spmf.input.sequence_database_list_integers.SequenceDatabase;
 import ca.pfv.spmf.patterns.itemset_list_integers_without_support.Itemset;
 import sequencemining.sequence.Sequence;
 
-import com.google.common.base.Functions;
-import com.google.common.collect.ImmutableSortedMap;
-import com.google.common.collect.Ordering;
-
 public class FrequentSequenceMining {
 
 	public static void main(final String[] args) throws IOException {
 
-		// FIM parameters
-		final String dataset = "libraries_filtered";
-		final double minSupp = 0.016; // relative support
-		final String dbPath = "/afs/inf.ed.ac.uk/user/j/jfowkes/Code/Sequences/Datasets/API/libraries/"
-				+ dataset + ".dat";
-		final String saveFile = "/disk/data1/jfowkes/logs/" + dataset + ".txt";
+		// Datasets and parameters
+		final String[] datasets = { "alice_punc", "GAZELLE1", "jmlr", "SIGN", "auslan2", "pioneer", "aslbu", "skating",
+				"aslgt", "context" };
+		final double[] minSupps = new double[] { 0.02, 0.004, 0.15, 0.45, 0.0001, 0.1, 0.04, 0.43, 0.25, 0.49 };
 
-		mineFrequentSequencesSPAM(dbPath, saveFile, minSupp);
-		final SortedMap<Sequence, Integer> freqItemsets = readFrequentSequences(new File(
-				saveFile));
-		System.out.println("\nFSM Sequences");
-		System.out.println("No sequences: " + freqItemsets.size());
-
+		for (int i = 0; i < datasets.length; i++) {
+			final String dbPath = "/afs/inf.ed.ac.uk/user/j/jfowkes/Code/Sequences/Datasets/Paper/" + datasets[i]
+					+ ".dat";
+			final String saveFile = "/afs/inf.ed.ac.uk/user/j/jfowkes/Code/Sequences/BIDE/" + datasets[i] + ".txt";
+			mineClosedFrequentSequencesBIDE(dbPath, saveFile, minSupps[i]);
+		}
 	}
 
 	/** Run PrefixSpan algorithm */
-	public static SortedMap<Sequence, Integer> mineFrequentSequencesPrefixSpan(
-			final String dataset, final String saveFile, final double minSupp)
-			throws IOException {
+	public static SortedMap<Sequence, Integer> mineFrequentSequencesPrefixSpan(final String dataset,
+			final String saveFile, final double minSupp) throws IOException {
 
 		final SequenceDatabase sequenceDatabase = new SequenceDatabase();
 		sequenceDatabase.loadFile(dataset);
 
 		final AlgoPrefixSpan algo = new AlgoPrefixSpan();
 		algo.setShowSequenceIdentifiers(false);
-		final SequentialPatterns patterns = algo.runAlgorithm(sequenceDatabase,
-				minSupp, saveFile);
+		final SequentialPatterns patterns = algo.runAlgorithm(sequenceDatabase, minSupp, saveFile);
 		// algo.printStatistics(sequenceDatabase.size());
 
 		return toMap(patterns);
 	}
 
 	/** Run SPADE algorithm */
-	public static SortedMap<Sequence, Integer> mineFrequentSequencesSPADE(
-			final String dataset, final String saveFile, final double minSupp)
-			throws IOException {
+	public static SortedMap<Sequence, Integer> mineFrequentSequencesSPADE(final String dataset, final String saveFile,
+			final double minSupp) throws IOException {
 
 		final boolean verbose = true;
 
-		final AbstractionCreator abstractionCreator = AbstractionCreator_Qualitative
-				.getInstance();
+		final AbstractionCreator abstractionCreator = AbstractionCreator_Qualitative.getInstance();
 		final ca.pfv.spmf.algorithms.sequentialpatterns.spade_spam_AGP.dataStructures.database.SequenceDatabase sequenceDatabase = new ca.pfv.spmf.algorithms.sequentialpatterns.spade_spam_AGP.dataStructures.database.SequenceDatabase(
 				abstractionCreator, IdListCreator_FatBitmap.getInstance());
 		sequenceDatabase.loadFile(dataset, minSupp);
 
 		final AlgoSPADE algo = new AlgoSPADE(minSupp, true, abstractionCreator);
-		final CandidateGenerator candidateGenerator = CandidateGenerator_Qualitative
-				.getInstance();
-		algo.runAlgorithmParallelized(sequenceDatabase, candidateGenerator,
-				true, verbose, saveFile, false);
+		final CandidateGenerator candidateGenerator = CandidateGenerator_Qualitative.getInstance();
+		algo.runAlgorithmParallelized(sequenceDatabase, candidateGenerator, true, verbose, saveFile, false);
 		// algo.printStatistics();
 
 		return null;
 	}
 
 	/** Run SPAM algorithm */
-	public static SortedMap<Sequence, Integer> mineFrequentSequencesSPAM(
-			final String dataset, final String saveFile, final double minSupp)
-			throws IOException {
+	public static SortedMap<Sequence, Integer> mineFrequentSequencesSPAM(final String dataset, final String saveFile,
+			final double minSupp) throws IOException {
 
 		final boolean verbose = true;
 
-		final AbstractionCreator abstractionCreator = AbstractionCreator_Qualitative
-				.getInstance();
+		final AbstractionCreator abstractionCreator = AbstractionCreator_Qualitative.getInstance();
 		final ca.pfv.spmf.algorithms.sequentialpatterns.spade_spam_AGP.dataStructures.database.SequenceDatabase sequenceDatabase = new ca.pfv.spmf.algorithms.sequentialpatterns.spade_spam_AGP.dataStructures.database.SequenceDatabase(
 				abstractionCreator, IdListCreator_FatBitmap.getInstance());
 		sequenceDatabase.loadFile(dataset, minSupp);
 
 		final AlgoSPAM_AGP algorithm = new AlgoSPAM_AGP(minSupp);
-		algorithm
-				.runAlgorithm(sequenceDatabase, true, verbose, saveFile, false);
+		algorithm.runAlgorithm(sequenceDatabase, true, verbose, saveFile, false);
 		// algo.printStatistics();
 
 		return null;
 	}
 
 	/** Run BIDE algorithm */
-	public static SortedMap<Sequence, Integer> mineClosedFrequentSequencesBIDE(
-			final String dataset, final String saveFile, final double minSupp)
-			throws IOException {
+	public static SortedMap<Sequence, Integer> mineClosedFrequentSequencesBIDE(final String dataset,
+			final String saveFile, final double minSupp) throws IOException {
 
 		final SequenceDatabase sequenceDatabase = new SequenceDatabase();
 		sequenceDatabase.loadFile(dataset);
@@ -121,16 +109,14 @@ public class FrequentSequenceMining {
 
 		final AlgoBIDEPlus algo = new AlgoBIDEPlus();
 		algo.setShowSequenceIdentifiers(false);
-		final SequentialPatterns patterns = algo.runAlgorithm(sequenceDatabase,
-				saveFile, absMinSupp);
+		final SequentialPatterns patterns = algo.runAlgorithm(sequenceDatabase, saveFile, absMinSupp);
 		// algo.printStatistics(sequenceDatabase.size());
 
 		return toMap(patterns);
 	}
 
 	/** Convert frequent sequences to sorted Map<Sequence, Integer> */
-	public static SortedMap<Sequence, Integer> toMap(
-			final SequentialPatterns patterns) {
+	public static SortedMap<Sequence, Integer> toMap(final SequentialPatterns patterns) {
 		if (patterns == null) {
 			return null;
 		} else {
@@ -145,16 +131,14 @@ public class FrequentSequenceMining {
 				}
 			}
 			// Sort patterns by support
-			final Ordering<Sequence> comparator = Ordering.natural().reverse()
-					.onResultOf(Functions.forMap(sequences))
+			final Ordering<Sequence> comparator = Ordering.natural().reverse().onResultOf(Functions.forMap(sequences))
 					.compound(Ordering.usingToString());
 			return ImmutableSortedMap.copyOf(sequences, comparator);
 		}
 	}
 
 	/** Read in frequent sequences (sorted by support) */
-	public static SortedMap<Sequence, Integer> readFrequentSequences(
-			final File output) throws IOException {
+	public static SortedMap<Sequence, Integer> readFrequentSequences(final File output) throws IOException {
 		final HashMap<Sequence, Integer> sequences = new HashMap<>();
 
 		final LineIterator it = FileUtils.lineIterator(output);
@@ -171,8 +155,7 @@ public class FrequentSequenceMining {
 			}
 		}
 		// Sort sequences by support
-		final Ordering<Sequence> comparator = Ordering.natural().reverse()
-				.onResultOf(Functions.forMap(sequences))
+		final Ordering<Sequence> comparator = Ordering.natural().reverse().onResultOf(Functions.forMap(sequences))
 				.compound(Ordering.usingToString());
 		return ImmutableSortedMap.copyOf(sequences, comparator);
 	}

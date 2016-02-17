@@ -29,65 +29,6 @@ public class TransactionGenerator {
 	private static final boolean VERBOSE = false;
 
 	/**
-	 * Create interesting sequences that highlight problems
-	 *
-	 * @param difficultyLevel
-	 *            An integer between 0 and 10
-	 *
-	 * @param noInstances
-	 *            The number of example sequecne instances
-	 */
-	public static HashMap<Sequence, Double> generateExampleSequences(final String name, final int noInstances,
-			final int difficultyLevel) {
-
-		final HashMap<Sequence, Double> sequences = new HashMap<>();
-
-		// Difficulty scaling (times 10^0 to 10^-1)
-		final double scaling = Math.pow(10, -difficultyLevel / 10.);
-
-		int maxElement = 80;
-		for (int j = 0; j < noInstances; j++) {
-
-			// Here [1, 2] is the champagne & caviar problem
-			// (not retrieved when support is too high)
-			if (name.equals("caviar")) {
-
-				// Champagne & Caviar
-				final Sequence s12 = new Sequence(maxElement + 1, maxElement + 2);
-				final double p12 = 0.05 * scaling;
-				sequences.put(s12, p12);
-				maxElement += 2;
-
-			}
-			// Here [B, 1] would be seen as a frequent sequence
-			// if both [B] and [1] have sufficiently high support
-			else if (name.equals("freerider")) {
-
-				final Sequence s1 = new Sequence(maxElement + 1);
-				final double p1 = 0.5 * scaling;
-				sequences.put(s1, p1);
-				maxElement += 1;
-
-			}
-			// Here [1, B] is known as a cross-support pattern
-			// if [1] has high support and [B] low support
-			// (spuriously generated when support is too low)
-			else if (name.equals("cross-supp")) {
-
-				final Sequence s1 = new Sequence(maxElement + 1);
-				final double p1 = 0.95 * scaling;
-				sequences.put(s1, p1);
-				maxElement += 1;
-
-			} else
-				throw new IllegalArgumentException("Incorrect problem name.");
-
-		}
-
-		return sequences;
-	}
-
-	/**
 	 * Generate transactions from set of interesting sequences
 	 *
 	 * @return set of sequences added to transaction

@@ -1,141 +1,101 @@
 package sequencemining.eval;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.PrintStream;
+import java.io.Writer;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import java.util.SortedMap;
+
+import org.apache.commons.io.output.TeeOutputStream;
+
+import com.google.common.base.Charsets;
+import com.google.common.io.Files;
 
 import sequencemining.main.SequenceMiningCore;
 import sequencemining.sequence.Sequence;
 
 public class SequenceSymmetricDistance {
 
-	private static final int topN = 100;
-	private static final String baseDir = "/afs/inf.ed.ac.uk/user/j/jfowkes/Code/Sequences/";
-
 	public static void main(final String[] args) throws IOException {
 
-		// TODO add ISM libraries...
 		// TODO re-run BIDE...
-		final String[] ISMlogs = new String[] { "ISM-alice_punc-09.11.2015-12:21:26.log",
-				"ISM-jmlr-10.11.2015-10:17:49.log", "ISM-SIGN-11.11.2015-13:41:54.log" };
-		final String[] datasets = new String[] { "alice_punc", "jmlr", "SIGN" };
+		final int topN = 50;
+		final String baseDir = "/afs/inf.ed.ac.uk/user/j/jfowkes/Code/Sequences/";
+		final String[] datasets = new String[] { "alice_punc", "GAZELLE1", "jmlr", "SIGN", "aslbu", "aslgt", "auslan2",
+				"context", "pioneer", "skating" };
 
-		for (int i = 0; i < ISMlogs.length; i++) {
+		// Set up logging
+		final FileOutputStream outFile = new FileOutputStream(baseDir + "redundancy.txt");
+		final TeeOutputStream out = new TeeOutputStream(System.out, outFile);
+		final PrintStream ps = new PrintStream(out);
+		System.setOut(ps);
+
+		final Writer writer = Files.newWriter(new File(baseDir + "redundancy.tex"), Charsets.UTF_8);
+
+		for (int i = 0; i < datasets.length; i++) {
 
 			System.out.println("===== Dataset: " + datasets[i]);
 
-			// Read in interesting sequences
+			// ISM sequences
 			final Map<Sequence, Double> intSequences = SequenceMiningCore
-					.readISMSequences(new File(baseDir + "Logs/" + ISMlogs[i]));
-			System.out.println("\nISM Sequences\n-----------");
-			System.out.println("No sequences: " + intSequences.size());
-			System.out.println("No items: " + countNoItems(intSequences.keySet()));
+					.readISMSequences(new File(baseDir + "Logs/" + datasets[i] + ".log"));
+			calculateRedundancyStats("ISM", intSequences, topN, writer);
 
-			// Get top interesting sequences
-			final Set<Sequence> topIntSequences = filterSingletons(intSequences);
-
-			// Calculate redundancy
-			double avgMinDiff = calculateRedundancy(topIntSequences);
-			System.out.println("\nAvg min edit dist: " + avgMinDiff);
-
-			// Calculate spuriousness
-			double avgMaxSpur = calculateSpuriousness(topIntSequences);
-			System.out.println("Avg no. subseq: " + avgMaxSpur);
-
-			// Calculate no. items
-			int noItems = countNoItems(topIntSequences);
-			System.out.println("No. items: " + noItems);
-
-			// Calculate size
-			double avgSize = calculateAverageSize(topIntSequences);
-			System.out.println("Avg subseq size: " + avgSize);
-
-			// Read in SQS sequences
+			// SQS sequences
 			final Map<Sequence, Double> sqsSequences = StatisticalSequenceMining
 					.readSQSSequences(new File(baseDir + "SQS/" + datasets[i] + ".txt"));
-			System.out.println("\nSQS Sequences\n-----------");
-			System.out.println("No sequences: " + sqsSequences.size());
-			System.out.println("No items: " + countNoItems(sqsSequences.keySet()));
+			calculateRedundancyStats("SQS", sqsSequences, topN, writer);
 
-			// Get top SQS sequences
-			final Set<Sequence> topSQSSequences = filterSingletons(sqsSequences);
-
-			// Calculate redundancy
-			avgMinDiff = calculateRedundancy(topSQSSequences);
-			System.out.println("\nAvg min edit dist: " + avgMinDiff);
-
-			// Calculate spuriousness
-			avgMaxSpur = calculateSpuriousness(topSQSSequences);
-			System.out.println("Avg no. subseq: " + avgMaxSpur);
-
-			// Calculate no. items
-			noItems = countNoItems(topSQSSequences);
-			System.out.println("No. items: " + noItems);
-
-			// Calculate size
-			avgSize = calculateAverageSize(topSQSSequences);
-			System.out.println("Avg subseq size: " + avgSize);
-
-			// Read in GoKrimp sequences
+			// GoKrimp sequences
 			final Map<Sequence, Double> gokrimpSequences = StatisticalSequenceMining
-					.readGoKRIMPSequences(new File(baseDir + "GoKRIMP/" + datasets[i] + ".txt"));
-			System.out.println("\nGoKrimp Sequences\n-----------");
-			System.out.println("No sequences: " + gokrimpSequences.size());
-			System.out.println("No items: " + countNoItems(gokrimpSequences.keySet()));
+					.readGoKrimpSequences(new File(baseDir + "GoKrimp/" + datasets[i] + ".txt"));
+			calculateRedundancyStats("GoKrimp", gokrimpSequences, topN, writer);
 
-			// Get top GoKrimp sequences
-			final Set<Sequence> topGoKrimpSequences = filterSingletons(gokrimpSequences);
-
-			// Calculate redundancy
-			avgMinDiff = calculateRedundancy(topGoKrimpSequences);
-			System.out.println("\nAvg min edit dist: " + avgMinDiff);
-
-			// Calculate spuriousness
-			avgMaxSpur = calculateSpuriousness(topGoKrimpSequences);
-			System.out.println("Avg no. subseq: " + avgMaxSpur);
-
-			// Calculate no. items
-			noItems = countNoItems(topGoKrimpSequences);
-			System.out.println("No. items: " + noItems);
-
-			// Calculate size
-			avgSize = calculateAverageSize(topGoKrimpSequences);
-			System.out.println("Avg subseq size: " + avgSize);
-
-			// Read in frequent sequences
-			final SortedMap<Sequence, Integer> freqSequences = FrequentSequenceMining
-					.readFrequentSequences(new File(baseDir + "FSM/" + datasets[i] + ".txt"));
-			System.out.println("\nFSM Sequences\n------------");
-			System.out.println("No sequences: " + freqSequences.size());
-			System.out.println("No items: " + countNoItems(freqSequences.keySet()));
-
-			// // Get top frequent sequences
-			// final Set<Sequence> topFreqSequences =
-			// filterSingletons(freqSequences);
-			//
-			// // Calculate redundancy
-			// avgMinDiff = calculateRedundancy(topFreqSequences);
-			// System.out.println("\nAvg min edit dist: " + avgMinDiff);
-			//
-			// // Calculate spuriousness
-			// avgMaxSpur = calculateSpuriousness(topFreqSequences);
-			// System.out.println("Avg no. subseq: " + avgMaxSpur);
-			//
-			// // Calculate no. items
-			// noItems = countNoItems(topFreqSequences);
-			// System.out.println("No. items: " + noItems);
-			//
-			// // Calculate size
-			// avgSize = calculateAverageSize(topFreqSequences);
-			// System.out.println("Avg subseq size: " + avgSize);
+			// BIDE sequences
+			final Map<Sequence, Integer> bideSequences = FrequentSequenceMining
+					.readFrequentSequences(new File(baseDir + "BIDE/" + datasets[i] + ".txt"));
+			calculateRedundancyStats("BIDE", bideSequences, topN, writer);
 
 			System.out.println();
-
 		}
+		writer.close();
 
+	}
+
+	private static <V> void calculateRedundancyStats(final String name, final Map<Sequence, V> intSequences,
+			final int topN, final Writer writer) throws IOException {
+		System.out.println("\n" + name + " Sequences\n-----------");
+		System.out.println("No. sequences: " + intSequences.size());
+		if (name.equals("ISM"))
+			System.out.println(
+					"No. non-singleton sequences: " + filterSingletons(intSequences, Integer.MAX_VALUE).size());
+		System.out.println("No. items: " + countNoItems(intSequences.keySet()));
+
+		// Get top sequences and calculate stats
+		final Set<Sequence> topIntSequences = filterSingletons(intSequences, topN);
+
+		final double avgMinDiff = calculateRedundancy(topIntSequences);
+		System.out.println("\nAvg. min edit dist: " + avgMinDiff);
+		writer.write("$" + avgMinDiff + "$ & ");
+
+		// Calculate spuriousness
+		final double avgMaxSpur = calculateSpuriousness(topIntSequences);
+		System.out.println("Avg. no. subseq: " + avgMaxSpur);
+		writer.write("$" + avgMaxSpur + "$ & ");
+
+		// Calculate no. items
+		final int noItems = countNoItems(topIntSequences);
+		System.out.println("No. items: " + noItems);
+		writer.write("$" + noItems + "$ & ");
+
+		// Calculate size
+		final double avgSize = calculateAverageSize(topIntSequences);
+		System.out.println("Avg. subseq size: " + avgSize);
+
+		writer.write("\n");
 	}
 
 	private static <V> double calculateRedundancy(final Set<Sequence> topItemsets) {
@@ -228,22 +188,22 @@ public class SequenceSymmetricDistance {
 	}
 
 	/** Filter out singletons */
-	private static <V> Set<Sequence> filterSingletons(final Map<Sequence, V> itemsets) {
+	static <V> Set<Sequence> filterSingletons(final Map<Sequence, V> seqs, final int topN) {
 
 		int count = 0;
-		final Set<Sequence> topItemsets = new HashSet<>();
-		for (final Sequence set : itemsets.keySet()) {
+		final Set<Sequence> topSeqs = new HashSet<>();
+		for (final Sequence set : seqs.keySet()) {
 			if (set.size() != 1) {
-				topItemsets.add(set);
+				topSeqs.add(set);
 				count++;
 			}
 			if (count == topN)
 				break;
 		}
-		if (count < 100)
-			System.out.println("Not enough non-singleton sequences in set: " + count);
+		if (topN != Integer.MAX_VALUE && count < topN)
+			System.out.println("WARNING: not enough non-singleton sequences in set: " + count);
 
-		return topItemsets;
+		return topSeqs;
 	}
 
 	private static int isSubseq(final Sequence seq1, final Sequence seq2) {
