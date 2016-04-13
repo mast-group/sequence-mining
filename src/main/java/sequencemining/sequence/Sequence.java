@@ -16,7 +16,7 @@ public class Sequence extends AbstractSequence implements Serializable {
 	}
 
 	/**
-	 * Shallow Copy Constructor (with default occurrence)
+	 * Shallow Copy Constructor
 	 *
 	 * @param seq
 	 *            sequence to shallow copy
@@ -46,7 +46,7 @@ public class Sequence extends AbstractSequence implements Serializable {
 	}
 
 	/**
-	 * Join Constructor (naturally uses minimum occurrence)
+	 * Join Constructor
 	 *
 	 * @param seqs
 	 *            two sequences that should be joined
