@@ -153,7 +153,6 @@ public class SequenceMining extends SequenceMiningCore {
 	public static TransactionList readTransactions(final File inputFile) throws IOException {
 
 		final List<Transaction> transactions = new ArrayList<>();
-		final List<String> cachedLines = new ArrayList<>();
 
 		// for each line (transaction) until the end of file
 		final LineIterator it = FileUtils.lineIterator(inputFile, "UTF-8");
@@ -166,9 +165,6 @@ public class SequenceMining extends SequenceMiningCore {
 				continue;
 			}
 
-			// cache line as string (for fast support counting)
-			cachedLines.add(line);
-
 			// split the transaction into items
 			final String[] lineSplited = line.split(" ");
 			// convert to Transaction class and add it to the structure
@@ -178,10 +174,7 @@ public class SequenceMining extends SequenceMiningCore {
 		// close the input file
 		LineIterator.closeQuietly(it);
 
-		// Convert cached lines to array
-		final String[] cachedDB = cachedLines.toArray(new String[cachedLines.size()]);
-
-		return new TransactionList(transactions, cachedDB);
+		return new TransactionList(transactions);
 	}
 
 	/**
