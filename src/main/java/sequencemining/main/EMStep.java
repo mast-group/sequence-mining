@@ -14,11 +14,11 @@ import com.google.common.collect.HashBasedTable;
 import com.google.common.collect.Multiset;
 import com.google.common.collect.Table;
 
-import scala.Tuple2;
 import sequencemining.main.InferenceAlgorithms.InferenceAlgorithm;
 import sequencemining.sequence.Sequence;
 import sequencemining.transaction.Transaction;
 import sequencemining.transaction.TransactionDatabase;
+import sequencemining.util.Tuple2;
 
 /** Class to hold the various transaction EM Steps */
 public class EMStep {

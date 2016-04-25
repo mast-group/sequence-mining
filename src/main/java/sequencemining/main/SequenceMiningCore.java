@@ -19,10 +19,10 @@ import com.google.common.collect.ImmutableSortedMap;
 import com.google.common.collect.Ordering;
 import com.google.common.collect.Table;
 
-import scala.Tuple2;
 import sequencemining.main.InferenceAlgorithms.InferenceAlgorithm;
 import sequencemining.sequence.Sequence;
 import sequencemining.transaction.TransactionDatabase;
+import sequencemining.util.Tuple2;
 
 public abstract class SequenceMiningCore {
 
