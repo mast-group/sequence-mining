@@ -31,7 +31,7 @@ public abstract class SequenceMiningCore {
 	private static final double OPTIMIZE_TOL = 1e-5;
 
 	protected static final Logger logger = Logger.getLogger(SequenceMiningCore.class.getName());
-	public static final File LOG_DIR = new File("/disk/data1/jfowkes/logs/");
+	public static final File LOG_DIR = new File("/tmp/");
 
 	/** Variable settings */
 	protected static Level LOG_LEVEL = Level.FINE;
