@@ -101,6 +101,12 @@ For example, the first few lines of output for the usage example above are:
 See the accompanying [paper](http://arxiv.org/abs/1602.05012) for details of how to interpret 'interestingness' and 'probability' under ISM's probabilistic model.
 
 
+Datasets
+--------
+
+The datasets used in the paper are available in the ```datasets``` subdirectory. All datasets are in [SPMF](http://www.philippe-fournier-viger.com/spmf/) format (see above). The classification datasets additionally include the class labels for each transaction in a ```.lab``` file.
+
+
 Bugs
 ----
 
@@ -110,4 +116,4 @@ Please report any bugs using GitHub's issue tracker.
 License
 -------
 
-This algorithm is released under the GNU GPLv3 license. Other licenses available on request.
+This algorithm is released under the GNU GPLv3 license. Other licenses are available on request.
