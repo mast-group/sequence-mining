@@ -1,5 +1,9 @@
 #!/bin/bash
-for db in GAZELLE1 alice_punc jmlr SIGN context auslan2 pioneer aslbu skating aslgt parallel
+for db in gazelle alice jmlr sign parallel
 do
-java -cp target/driver-sequence-mining-1.0-SNAPSHOT.jar sequencemining.main.SequenceMining -f ~/Code/Sequences/Datasets/Paper/$db.dat
+java -cp sequence-mining/target/sequence-mining-1.0.jar sequencemining.main.SequenceMining -f datasets/$db.dat
+done
+for db in context auslan2 pioneer aslbu skating aslgt
+do
+java -cp sequence-mining/target/sequence-mining-1.0.jar sequencemining.main.SequenceMining -f datasets/classification/$db.dat
 done 

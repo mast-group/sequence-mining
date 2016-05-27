@@ -52,10 +52,7 @@ In Eclipse you can set command line arguments for the ISM interface using the *R
 A complete example using the command line interface on a runnable jar. We can mine the provided example dataset ```example.dat``` as follows: 
 
   ```sh 
-  $ java -cp sequence-mining/target/sequence-mining-1.0.jar sequencemining.main.SequenceMining     
-   -i 100
-   -f example.dat 
-   -v 
+  $ java -jar sequence-mining/target/sequence-mining-1.0.jar -i 100 -f example.dat -v 
   ```
 
 which will output to the console. Omitting the ```-v``` flag will redirect output to a log-file in ```/tmp/```. 

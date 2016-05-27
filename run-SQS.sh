@@ -1,2 +1,2 @@
 #!/bin/bash
-java -cp target/driver-sequence-mining-1.0-SNAPSHOT.jar sequencemining.eval.StatisticalSequenceMining
+java -cp sequence-mining/target/sequence-mining-1.0.jar sequencemining.eval.StatisticalSequenceMining
