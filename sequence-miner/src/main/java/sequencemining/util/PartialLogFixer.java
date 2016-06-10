@@ -46,14 +46,16 @@ public class PartialLogFixer {
 		while (line != null) {
 
 			if (line.contains("Parameter Optimal Sequences:")) {
-				final Matcher m = Pattern.compile("\\[((?:[0-9]|,| )+?)\\]=([-+]?[0-9]*\\.?[0-9]+(?:[eE][-+]?[0-9]+)?)")
+				final Matcher m = Pattern
+						.compile(
+								"\\[((?:[0-9]|,| )+?)\\]=\\(((?:(?:[-+]?[0-9]*\\.?[0-9]+(?:[eE][-+]?[0-9]+)?)|,)+?)\\)")
 						.matcher(line);
 				while (m.find()) {
 					final Sequence sequence = new Sequence();
 					final String[] items = m.group(1).split(", ");
 					for (final String item : items)
 						sequence.add(Integer.parseInt(item));
-					final double prob = Double.parseDouble(m.group(2));
+					final double prob = 1 - Double.parseDouble(m.group(2).split(",")[0]);
 					sequences.put(sequence, prob);
 				}
 				break;
