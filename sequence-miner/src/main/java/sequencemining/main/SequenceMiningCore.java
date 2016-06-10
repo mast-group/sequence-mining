@@ -7,6 +7,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.PriorityQueue;
 import java.util.Set;
 import java.util.logging.Level;
@@ -242,34 +243,63 @@ public abstract class SequenceMiningCore {
 
 		// Find maxSteps superseqs for all seqs
 		// final long startTime = System.nanoTime();
-		int iteration = 0;
+		int noAdded = 0;
+		int istart = 0;
+		int jstart = 0;
+		int kstart = 0;
+		boolean exhausted = true;
 		final int len = sortedSequences.size();
-		outerLoop: for (int k = 0; k < 2 * len - 2; k++) {
-			for (int i = 0; i < len && i < k + 1; i++) {
-				for (int j = 0; j < len && i + j < k + 1; j++) {
-					if (k <= i + j && i != j) {
+		while (noAdded < maxSteps && exhausted) {
+			exhausted = false;
+			int noUncached = 0;
+			final HashSet<Sequence> uncachedCandidates = new HashSet<>();
+			outerLoop: for (int k = kstart; k < 2 * len - 2; k++) {
+				for (int i = istart; i < len && i < k + 1; i++) {
+					for (int j = jstart; j < len && i + j < k + 1; j++) {
+						if (k <= i + j && i != j) {
 
-						// Create new candidates by joining seqs
-						final Sequence seq1 = sortedSequences.get(i);
-						final Sequence seq2 = sortedSequences.get(j);
-						final Sequence cand = new Sequence(seq1, seq2);
+							// Create new candidates by joining seqs
+							final Sequence seq1 = sortedSequences.get(i);
+							final Sequence seq2 = sortedSequences.get(j);
+							final Sequence cand = new Sequence(seq1, seq2);
 
-						// Add candidate to queue
-						if (cand != null && !rejected_seqs.contains(cand)) {
-							Integer supp = candidateSupports.get(cand);
-							if (supp == null)
-								supp = EMStep.getSupportOfSequence(transactions, cand);
-							if (supp > 0) { // ignore unsupported seqs
-								candidateSupports.put(cand, supp);
-								candidateQueue.add(cand);
-								iteration++;
+							// Add candidate to queue
+							if (cand != null && !rejected_seqs.contains(cand)) {
+								final Integer supp = candidateSupports.get(cand);
+								if (supp == null) {
+									uncachedCandidates.add(cand);
+									noUncached++;
+								} else { // add cached candidate to queue
+									candidateQueue.add(cand);
+									noAdded++;
+								}
+							}
+
+							// Possibly found enough candidates
+							if (noAdded + noUncached >= maxSteps) {
+								istart = i;
+								jstart = j + 1;
+								kstart = k;
+								exhausted = true;
+								break outerLoop;
 							}
 						}
-
-						if (iteration >= maxSteps) // Queue limit exceeded
-							break outerLoop; // finished building queue
-
 					}
+					jstart = 0;
+				}
+				istart = 0;
+			}
+
+			// Add uncached candidates to queue
+			final Map<Sequence, Long> candidatesWithSupports = EMStep.getSupportsOfSequences(transactions,
+					uncachedCandidates);
+			for (final Entry<Sequence, Long> entry : candidatesWithSupports.entrySet()) {
+				final Sequence cand = entry.getKey();
+				final int supp = Math.toIntExact(entry.getValue());
+				if (supp > 0) { // ignore unsupported sequences
+					candidateSupports.put(cand, supp);
+					candidateQueue.add(cand);
+					noAdded++;
 				}
 			}
 		}
@@ -294,7 +324,7 @@ public abstract class SequenceMiningCore {
 			}
 		}
 
-		if (iteration >= maxSteps) { // Priority queue exhausted
+		if (exhausted) { // Priority queue exhausted
 			logger.warning("\n Priority queue exhausted. Exiting. \n");
 			transactions.setIterationLimitExceeded();
 			// return; // No better itemset found
@@ -369,11 +399,13 @@ public abstract class SequenceMiningCore {
 
 		final HashMap<Sequence, Double> interestingnessMap = new HashMap<>();
 
+		// Calculate supports
+		final Map<Sequence, Long> supports = EMStep.getSupportsOfSequences(transactions, sequences.keySet());
+
 		// Calculate interestingness
 		final long noTransactions = transactions.size();
 		for (final Sequence seq : sequences.keySet()) {
-			final double interestingness = sequences.get(seq) * noTransactions
-					/ (double) EMStep.getSupportOfSequence(transactions, seq);
+			final double interestingness = sequences.get(seq) * noTransactions / (double) supports.get(seq);
 			interestingnessMap.put(seq, Math.round(interestingness * 1E10) / 1E10);
 		}
 

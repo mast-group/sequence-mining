@@ -33,8 +33,7 @@ public class SequenceScaling {
 
 	/** Set of mined itemsets to use for background */
 	private static final String name = "SIGN-based";
-	private static final File sequenceLog = new File(
-			"/afs/inf.ed.ac.uk/user/j/jfowkes/Code/Sequences/Logs/SIGN.log");
+	private static final File sequenceLog = new File("/afs/inf.ed.ac.uk/user/j/jfowkes/Code/Sequences/Logs/SIGN.log");
 
 	/** Spark Settings */
 	private static final long MAX_RUNTIME = 24 * 60; // 24hrs
@@ -44,7 +43,7 @@ public class SequenceScaling {
 	public static void main(final String[] args) throws IOException, ClassNotFoundException {
 
 		// Run
-		scalingTransactions(64, new int[] { 1_000, 10_000, 100_000, 1_000_000, 10_000_000, 100_000_000 });
+		scalingTransactions(32, new int[] { 1_000, 10_000, 100_000, 1_000_000 });
 	}
 
 	public static void scalingTransactions(final int noCores, final int[] trans)
@@ -83,7 +82,7 @@ public class SequenceScaling {
 			SequenceScaling.printTransactionDBStats(dbFile);
 
 			// Mine sequences
-			final File logFile = Logging.getLogFileName("IIM", true, saveDir, dbFile);
+			final File logFile = Logging.getLogFileName("ISM", true, saveDir, dbFile);
 			final long startTime = System.currentTimeMillis();
 			SequenceMining.mineSequences(dbFile, new InferGreedy(), maxStructureSteps, maxEMIterations, logFile, false);
 

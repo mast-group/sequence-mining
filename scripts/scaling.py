@@ -8,7 +8,7 @@ rc('ytick', labelsize=16)
 
 trans = [1E3, 1E4, 1E5, 1E6]
 linear_trans = [1E1, 1E2, 1E3, 1E4]
-s32_time = [82.42,351.02,5784.,55403.44]
+s32_time = [71.062, 292.757, 3712.463, 40283.949]
 
 plt.figure(1)
 plt.hold(True)
