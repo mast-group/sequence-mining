@@ -98,22 +98,22 @@ public class SequenceSymmetricDistance {
 		writer.write("\n");
 	}
 
-	private static <V> double calculateRedundancy(final Set<Sequence> topItemsets) {
+	private static <V> double calculateRedundancy(final Set<Sequence> topSequences) {
 
 		double avgMinDiff = 0;
-		for (final Sequence set1 : topItemsets) {
+		for (final Sequence seq1 : topSequences) {
 
 			int minDiff = Integer.MAX_VALUE;
-			for (final Sequence set2 : topItemsets) {
-				if (!set1.equals(set2)) {
-					final int diff = editDistance(set1, set2);
+			for (final Sequence seq2 : topSequences) {
+				if (!seq1.equals(seq2)) {
+					final int diff = editDistance(seq1, seq2);
 					if (diff < minDiff)
 						minDiff = diff;
 				}
 			}
 			avgMinDiff += minDiff;
 		}
-		avgMinDiff /= topItemsets.size();
+		avgMinDiff /= topSequences.size();
 
 		return avgMinDiff;
 	}
@@ -165,24 +165,24 @@ public class SequenceSymmetricDistance {
 		return items.size();
 	}
 
-	private static double calculateAverageSize(final Set<Sequence> topItemsets) {
+	private static double calculateAverageSize(final Set<Sequence> topSequences) {
 
 		double avgSize = 0;
-		for (final Sequence seq : topItemsets)
+		for (final Sequence seq : topSequences)
 			avgSize += seq.size();
-		return avgSize / topItemsets.size();
+		return avgSize / topSequences.size();
 	}
 
-	private static <V> double calculateSpuriousness(final Set<Sequence> topItemsets) {
+	private static <V> double calculateSpuriousness(final Set<Sequence> topSequences) {
 
 		double avgSubseq = 0;
-		for (final Sequence set1 : topItemsets) {
-			for (final Sequence set2 : topItemsets) {
-				if (!set1.equals(set2))
-					avgSubseq += isSubseq(set1, set2);
+		for (final Sequence seq1 : topSequences) {
+			for (final Sequence seq2 : topSequences) {
+				if (!seq1.equals(seq2))
+					avgSubseq += isSubseq(seq1, seq2);
 			}
 		}
-		avgSubseq /= topItemsets.size();
+		avgSubseq /= topSequences.size();
 
 		return avgSubseq;
 	}
@@ -192,9 +192,9 @@ public class SequenceSymmetricDistance {
 
 		int count = 0;
 		final Set<Sequence> topSeqs = new HashSet<>();
-		for (final Sequence set : seqs.keySet()) {
-			if (set.size() != 1) {
-				topSeqs.add(set);
+		for (final Sequence seq : seqs.keySet()) {
+			if (seq.size() != 1) {
+				topSeqs.add(seq);
 				count++;
 			}
 			if (count == topN)
