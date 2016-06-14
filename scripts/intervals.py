@@ -2,6 +2,9 @@
 import matplotlib.pyplot as plt
 from matplotlib import rc
 
+rc('ps', fonttype=42)
+rc('pdf', fonttype=42)
+
 rc('xtick', labelsize=16) 
 rc('ytick', labelsize=16) 
 
