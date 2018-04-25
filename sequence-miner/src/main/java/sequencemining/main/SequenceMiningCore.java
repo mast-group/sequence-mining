@@ -13,6 +13,13 @@ import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.ExecutionException;
+
 import org.apache.commons.io.FileUtils;
 
 import com.google.common.base.Functions;
@@ -87,46 +94,72 @@ public abstract class SequenceMiningCore {
 		// Initialize average cost per transaction for singletons
 		expectationMaximizationStep(sequences, transactions, inferenceAlgorithm);
 
-		// Structural EM
-		boolean breakLoop = false;
-		for (int iteration = 1; iteration <= maxEMIterations; iteration++) {
+		ExecutorService service = Executors.newSingleThreadExecutor();
 
-			// Learn structure
-			logger.finer("\n----- Itemset Combination at Step " + iteration + "\n");
-			combineSequencesStep(sequences, transactions, rejected_seqs, inferenceAlgorithm, maxStructureSteps,
-					supportOrdering, supports, candidateSupportOrdering, candidateSupports);
-			if (transactions.getIterationLimitExceeded())
-				breakLoop = true;
-			logger.finer(String.format(" Average cost: %.2f%n", transactions.getAverageCost()));
+		try {
+		    Runnable r = new Runnable() {
+		        @Override
+		        public void run() {
+					// Structural EM
+		            boolean breakLoop = false;
+					for (int iteration = 1; iteration <= maxEMIterations; iteration++) {
 
-			// Optimize parameters of new structure
-			if (iteration % OPTIMIZE_PARAMS_EVERY == 0 || iteration == maxEMIterations || breakLoop == true) {
-				logger.fine("\n***** Parameter Optimization at Step " + iteration + "\n");
-				expectationMaximizationStep(sequences, transactions, inferenceAlgorithm);
-			}
+						// Learn structure
+						logger.finer("\n----- Itemset Combination at Step " + iteration + "\n");
+						combineSequencesStep(sequences, transactions, rejected_seqs, inferenceAlgorithm, maxStructureSteps,
+								supportOrdering, supports, candidateSupportOrdering, candidateSupports);
+						if (transactions.getIterationLimitExceeded())
+							breakLoop = true;
+						logger.finer(String.format(" Average cost: %.2f%n", transactions.getAverageCost()));
 
-			// Break loop if requested
-			if (breakLoop)
-				break;
+						// Optimize parameters of new structure
+						if (iteration % OPTIMIZE_PARAMS_EVERY == 0 || iteration == maxEMIterations || breakLoop == true) {
+							logger.fine("\n***** Parameter Optimization at Step " + iteration + "\n");
+							expectationMaximizationStep(sequences, transactions, inferenceAlgorithm);
+						}
 
-			// Check if time exceeded
-			if (System.currentTimeMillis() - startTime > MAX_RUNTIME) {
-				logger.warning("\nRuntime limit of " + MAX_RUNTIME / (60. * 1000.) + " minutes exceeded.\n");
-				break;
-			}
+						// Break loop if requested
+						if (breakLoop)
+							break;
 
-			// Spark: checkpoint every 100 iterations to avoid StackOverflow
-			// errors due to long lineage (http://tinyurl.com/ouswhrc)
-			// if (iteration % 100 == 0 && transactions instanceof
-			// TransactionRDD) {
-			// transactions.getTransactionRDD().cache();
-			// transactions.getTransactionRDD().checkpoint();
-			// transactions.getTransactionRDD().count();
-			// }
+						// Check if time exceeded
+						if (System.currentTimeMillis() - startTime > MAX_RUNTIME) {
+							logger.warning("\nRuntime limit of " + MAX_RUNTIME / (60. * 1000.) + " minutes exceeded.\n");
+							break;
+						}
 
-			if (iteration == maxEMIterations)
-				logger.warning("\nEM iteration limit exceeded.\n");
+						// Spark: checkpoint every 100 iterations to avoid StackOverflow
+						// errors due to long lineage (http://tinyurl.com/ouswhrc)
+						// if (iteration % 100 == 0 && transactions instanceof
+						// TransactionRDD) {
+						// transactions.getTransactionRDD().cache();
+						// transactions.getTransactionRDD().checkpoint();
+						// transactions.getTransactionRDD().count();
+						// }
+
+						if (iteration == maxEMIterations)
+							logger.warning("\nEM iteration limit exceeded.\n");
+					}
+		        }
+		    };
+
+		    Future<?> f = service.submit(r);
+
+		    f.get(MAX_RUNTIME, TimeUnit.MILLISECONDS);
 		}
+		catch (final InterruptedException e) {
+		    // The thread was interrupted during sleep, wait or join
+		}
+		catch (final TimeoutException e) {
+		    logger.warning("\nTimeout reached!\n");
+		}
+		catch (final ExecutionException e) {
+		    // An exception from within the Runnable task
+		}
+		finally {
+		    service.shutdown();
+		}
+
 		logger.info("\nElapsed time: " + (System.currentTimeMillis() - startTime) / (60. * 1000.) + " minutes.\n");
 
 		return sequences;
