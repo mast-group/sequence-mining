@@ -93,6 +93,8 @@ public class SequenceMining extends SequenceMiningCore {
 			jc.usage();
 		}
 
+		System.exit(0); // Required to prevent waiting for Runnable completion
+
 	}
 
 	/** Mine interesting sequences */
